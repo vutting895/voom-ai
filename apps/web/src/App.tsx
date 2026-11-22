@@ -52,7 +52,7 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  async function signIn(event: React.FormEvent) {
+  async function signIn(event: FormEvent) {
     event.preventDefault();
     if (!supabase) return setError(t.config);
     setBusy(true); setError("");
