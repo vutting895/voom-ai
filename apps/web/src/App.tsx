@@ -62,7 +62,7 @@ export default function App() {
     setPassword("");
   }
 
-  async function analyze(event: React.FormEvent) {
+  async function analyze(event: FormEvent) {
     event.preventDefault(); setError(""); setResult(null);
     if (!accessToken) return setError(t.authRequired);
     if (!apiBaseUrl) return setError(t.config);
