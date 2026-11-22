@@ -14,9 +14,11 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "NOVA_ANALYSIS_API_BASE_URL", "\"https://REPLACE_WITH_NOVA_SYSTEM_HUB\"")
-        buildConfigField("String", "SUPABASE_URL", "\"REPLACE_WITH_SUPABASE_URL\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"REPLACE_WITH_PUBLIC_ANON_KEY\"")
+        // Empty defaults fail closed. Supply public configuration only after
+        // Android Auth/API integration is implemented and reviewed.
+        buildConfigField("String", "NOVA_ANALYSIS_API_BASE_URL", "\"\"\"")
+        buildConfigField("String", "SUPABASE_URL", "\"\"\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"\"\"")
     }
 
     buildFeatures { compose = true; buildConfig = true }
