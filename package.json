@@ -1,0 +1,11 @@
+{
+  "name": "voom-ai",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/web"],
+  "scripts": {
+    "dev:web": "npm --workspace @voom-ai/web run dev",
+    "build:web": "npm --workspace @voom-ai/web run build",
+    "typecheck:web": "npm --workspace @voom-ai/web run typecheck"
+  }
+}
