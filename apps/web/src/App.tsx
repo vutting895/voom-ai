@@ -226,6 +226,7 @@ export default function App() {
 
   async function signOut() {
     authGenerationRef.current += 1;
+    const signOutGeneration = authGenerationRef.current;
     userIdRef.current = null;
     chatAbortRef.current?.abort();
     chatAbortRef.current = null;
@@ -243,6 +244,8 @@ export default function App() {
         try { await supabase.auth.signOut({ scope: "local" }); } catch { /* local UI state is cleared below */ }
       }
     }
+    // Do not let a slow sign-out response clear a newer sign-in session.
+    if (authGenerationRef.current !== signOutGeneration) return;
     setAccessToken("");
     setResult(null);
     setChatMessages([]);
