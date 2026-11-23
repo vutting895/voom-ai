@@ -23,7 +23,7 @@ class AuthOperationGateTest {
         val operation = gate.begin()
 
         assertTrue(gate.isCurrent(operation))
-        assertTrue(gate.isCurrent(gate.currentId()))
+        assertTrue(gate.isCurrent(gate.begin()).not())
     }
 
     @Test
