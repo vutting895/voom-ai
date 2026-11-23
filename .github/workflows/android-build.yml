@@ -1,21 +1,48 @@
-name: Android Build
+name: Client Build Verification
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
     branches: [main]
     paths:
       - "apps/android/**"
+      - "apps/web/**"
+      - "netlify/**"
+      - "netlify.toml"
+      - "package.json"
+      - ".github/workflows/android-build.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-build-${{ github.event.pull_request.number || github.ref }}
+  group: client-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  web-build:
+    name: Typecheck and build web client
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install workspace dependencies
+        run: npm install --no-package-lock --no-audit --no-fund
+
+      - name: Typecheck web client
+        run: npm run typecheck:web
+
+      - name: Build web client
+        run: npm run build:web
+
   assemble-debug:
     name: Assemble Android debug APK
     runs-on: ubuntu-latest
