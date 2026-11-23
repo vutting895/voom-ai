@@ -170,7 +170,7 @@ export default function App() {
       if (typeof payload.message !== "string" || !payload.message.trim()) {
         throw new Error(language === "th" ? "NOVA AI ไม่ได้ส่งข้อความตอบกลับที่ถูกต้อง" : "NOVA AI returned an invalid message");
       }
-      setChatMessages([...requestMessages, { role: "assistant", content: payload.message }].slice(-8));
+      setChatMessages([...requestMessages, { role: "assistant" as const, content: payload.message }].slice(-8));
       setResult(payload);
       setChatInput("");
     } catch (cause) {
