@@ -2,10 +2,10 @@ name: Android Build
 
 on:
   pull_request:
+    types: [opened, reopened]
     branches: [main]
     paths:
       - "apps/android/**"
-      - ".github/workflows/android-build.yml"
   workflow_dispatch:
 
 permissions:
