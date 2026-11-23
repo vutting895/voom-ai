@@ -57,6 +57,34 @@ object NovaApi {
         }.start()
     }
 
+    fun signOut(accessToken: String, callback: (String?) -> Unit) {
+        Thread {
+            var error: String? = null
+            try {
+                val base = BuildConfig.SUPABASE_URL.trimEnd('/')
+                require(base.startsWith("https://")) { "Supabase HTTPS endpoint is not configured" }
+                val connection = (URL("$base/auth/v1/logout").openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    instanceFollowRedirects = false
+                    connectTimeout = CONNECT_TIMEOUT_MS
+                    readTimeout = READ_TIMEOUT_MS
+                    setRequestProperty("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    setRequestProperty("Authorization", "Bearer $accessToken")
+                    setRequestProperty("Accept", "application/json")
+                }
+                try {
+                    val status = connection.responseCode
+                    if (status !in 200..299) error = "Supabase sign-out returned HTTP $status"
+                } finally {
+                    connection.disconnect()
+                }
+            } catch (exception: Exception) {
+                error = exception.message?.take(160) ?: "Supabase sign-out request failed"
+            }
+            mainHandler.post { callback(error) }
+        }.start()
+    }
+
     fun sendChat(
         accessToken: String,
         messages: List<NovaChatMessage>,
