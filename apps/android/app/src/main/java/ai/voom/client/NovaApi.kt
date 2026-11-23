@@ -15,6 +15,7 @@ data class NovaChatReply(val message: String, val provider: String, val model: S
 object NovaApi {
     private const val CONNECT_TIMEOUT_MS = 8000
     private const val READ_TIMEOUT_MS = 16000
+    private const val MAX_REQUEST_BYTES = 16 * 1024
     private const val MAX_RESPONSE_BYTES = 64 * 1024
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -129,7 +130,10 @@ object NovaApi {
                     messages.forEach { message ->
                         put(JSONObject().put("role", message.role).put("content", message.content))
                     }
-                })
+                }).toString().toByteArray(Charsets.UTF_8)
+                require(payload.size <= MAX_REQUEST_BYTES) {
+                    "Conversation exceeds the 16 KB request limit"
+                }
                 val connection = (URL("$base/api/chat").openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     instanceFollowRedirects = false
@@ -141,7 +145,7 @@ object NovaApi {
                     setRequestProperty("Accept", "application/json")
                 }
                 try {
-                    connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+                    connection.outputStream.use { it.write(payload) }
                     val status = connection.responseCode
                     val response = readBoundedText(if (status in 200..299) connection.inputStream else connection.errorStream)
                     if (status !in 200..299) {
