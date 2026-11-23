@@ -89,28 +89,45 @@ export default function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const chatAbortRef = useRef<AbortController | null>(null);
+  const authGenerationRef = useRef(0);
+  const userIdRef = useRef<string | null>(null);
   const t = copy[language];
 
   useEffect(() => {
     if (!supabase) return;
+    const initialGeneration = authGenerationRef.current;
     void supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      // A late initial-session lookup must not overwrite a newer auth event.
+      if (authGenerationRef.current !== initialGeneration) return;
       if (sessionError) setError(language === "th" ? "ไม่สามารถกู้คืนสถานะการเข้าสู่ระบบได้" : "Unable to restore the sign-in session");
+      userIdRef.current = data.session?.user.id ?? null;
       setAccessToken(data.session?.access_token ?? "");
     }).catch(() => {
-      setError(language === "th" ? "ไม่สามารถเชื่อมต่อ Supabase Auth ได้" : "Unable to connect to Supabase Auth");
+      if (authGenerationRef.current === initialGeneration) {
+        setError(language === "th" ? "ไม่สามารถเชื่อมต่อ Supabase Auth ได้" : "Unable to connect to Supabase Auth");
+      }
     });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAccessToken(session?.access_token ?? "");
-      if (!session) {
+      const nextUserId = session?.user.id ?? null;
+      if (userIdRef.current !== nextUserId) {
+        // Account changes invalidate all in-flight chat work and user-scoped UI state.
+        userIdRef.current = nextUserId;
+        authGenerationRef.current += 1;
         chatAbortRef.current?.abort();
         chatAbortRef.current = null;
         setBusy(false);
         setResult(null);
         setChatMessages([]);
         setChatInput("");
+        setError("");
       }
+      setAccessToken(session?.access_token ?? "");
     });
-    return () => data.subscription.unsubscribe();
+    return () => {
+      data.subscription.unsubscribe();
+      authGenerationRef.current += 1;
+      chatAbortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -152,6 +169,8 @@ export default function App() {
       return;
     }
     setBusy(true);
+    const requestGeneration = authGenerationRef.current;
+    const requestUserId = userIdRef.current;
     chatAbortRef.current?.abort();
     const controller = new AbortController();
     chatAbortRef.current = controller;
@@ -183,11 +202,14 @@ export default function App() {
       if (typeof payload.message !== "string" || !payload.message.trim()) {
         throw new Error(language === "th" ? "NOVA AI ไม่ได้ส่งข้อความตอบกลับที่ถูกต้อง" : "NOVA AI returned an invalid message");
       }
+      if (authGenerationRef.current !== requestGeneration || userIdRef.current !== requestUserId) return;
       setChatMessages([...requestMessages, { role: "assistant" as const, content: payload.message }].slice(-8));
       setResult(payload);
       setChatInput("");
     } catch (cause) {
-      if (chatAbortRef.current === controller) {
+      if (chatAbortRef.current === controller &&
+          authGenerationRef.current === requestGeneration &&
+          userIdRef.current === requestUserId) {
         setError(cause instanceof DOMException && cause.name === "AbortError"
           ? (language === "th" ? "หมดเวลารอ NOVA AI (15 วินาที)" : "NOVA AI timed out (15 seconds)")
           : cause instanceof Error ? cause.message : t.apiFailed);
@@ -196,12 +218,15 @@ export default function App() {
       window.clearTimeout(timeout);
       if (chatAbortRef.current === controller) {
         chatAbortRef.current = null;
-        setBusy(false);
+        if (authGenerationRef.current === requestGeneration &&
+            userIdRef.current === requestUserId) setBusy(false);
       }
     }
   }
 
   async function signOut() {
+    authGenerationRef.current += 1;
+    userIdRef.current = null;
     chatAbortRef.current?.abort();
     chatAbortRef.current = null;
     setBusy(false);
