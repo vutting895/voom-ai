@@ -27,13 +27,26 @@ Client platform for Android and responsive web, integrated with NOVA Core throug
 - Android and web clients communicate with NOVA through versioned API contracts.
 - Authentication is handled through Supabase Auth; privileged credentials remain server-side.
 
-## Development policy
+## Development and CI policy
 
-- Zero-cost strict; no paid services or billing activation without explicit approval.
-- No CI/CD. Use local verification and manual release gates.
+- Zero-cost strict: no paid services or billing activation without explicit approval.
+- GitHub Actions CI is permitted for pull-request verification and explicitly requested manual runs.
+- Android CI is scoped to Android/workflow changes, uses hosted Ubuntu runners, and has bounded job time and artifact retention.
+- CI is verification-only: no deployment, signing, publishing, production release, or broker operations.
+- GitHub Actions usage on this private repository may consume included minutes/storage and could incur charges if account allowances are exceeded. Monitor usage; do not increase runner size, retention, or workflow frequency without approval.
+- Local verification remains preferred when practical; CI supplements it where the local environment lacks Android tooling.
 - No Base44 runtime.
 - Build, signing, installation, deployment, and production release require separate approval.
 
 ## Repository status
 
-This is the initial repository bootstrap. Application source code and implementation documentation will be added on feature branches and reviewed through pull requests.
+Application source code is developed on feature branches and reviewed through pull requests. Main is the source of truth; do not merge until required verification and manual review gates pass.
+
+## Android CI
+
+Workflow: `.github/workflows/android-build.yml`
+
+- Pull requests targeting `main` that modify `apps/android/**` or the workflow itself.
+- Manual `workflow_dispatch` runs.
+- Builds a debug APK only; no signing or release APK.
+- Uploads the debug APK as a short-lived artifact when the build succeeds.
