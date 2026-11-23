@@ -93,7 +93,12 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) return;
-    void supabase.auth.getSession().then(({ data }) => setAccessToken(data.session?.access_token ?? ""));
+    void supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      if (sessionError) setError(language === "th" ? "ไม่สามารถกู้คืนสถานะการเข้าสู่ระบบได้" : "Unable to restore the sign-in session");
+      setAccessToken(data.session?.access_token ?? "");
+    }).catch(() => {
+      setError(language === "th" ? "ไม่สามารถเชื่อมต่อ Supabase Auth ได้" : "Unable to connect to Supabase Auth");
+    });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => setAccessToken(session?.access_token ?? ""));
     return () => data.subscription.unsubscribe();
   }, []);
@@ -106,20 +111,52 @@ export default function App() {
     event.preventDefault();
     if (!supabase) { setError(t.config); return; }
     setBusy(true); setError("");
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (authError) setError(language === "th" ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง" : "Email or password is incorrect");
-    setPassword("");
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) {
+        setError(language === "th" ? "เข้าสู่ระบบไม่สำเร็จ โปรดตรวจสอบอีเมลและรหัสผ่าน" : "Sign-in failed. Check your email and password.");
+        return;
+      }
+      setPassword("");
+    } catch {
+      setError(language === "th" ? "เชื่อมต่อ Supabase Auth ไม่สำเร็จ" : "Could not reach Supabase Auth");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function analyze(event: FormEvent) {
     event.preventDefault(); setError(""); setResult(null);
     if (!accessToken) { setError(t.authRequired); return; }
     if (!apiBaseUrl) { setError(t.config); return; }
+    if (!/^[A-Za-z0-9._-]{1,40}$/.test(symbol)) {
+      setError(language === "th" ? "รูปแบบ Symbol ไม่ถูกต้อง" : "Invalid symbol format");
+      return;
+    }
+    if (candlesJson.length > 250_000) {
+      setError(language === "th" ? "ข้อมูลมีขนาดใหญ่เกินไป (สูงสุด 250 KB)" : "Payload is too large (250 KB maximum)");
+      return;
+    }
     let candles: unknown;
     try { candles = JSON.parse(candlesJson); } catch { setError(t.invalidJson); return; }
     if (!Array.isArray(candles) || candles.length < 35 || candles.length > 500) {
       setError(language === "th" ? "ต้องส่งข้อมูลแท่งเทียน 35–500 แท่ง" : "Provide between 35 and 500 candles");
+      return;
+    }
+    const validCandles = candles.every((item: unknown) => {
+      if (typeof item !== "object" || item === null || Array.isArray(item)) return false;
+      const candle = item as Record<string, unknown>;
+      const values = [candle.o, candle.h, candle.l, candle.c, candle.v];
+      return typeof candle.t === "string"
+        && Number.isFinite(Date.parse(candle.t))
+        && values.every(value => typeof value === "number" && Number.isFinite(value))
+        && (candle.h as number) >= Math.max(candle.o as number, candle.c as number)
+        && (candle.l as number) <= Math.min(candle.o as number, candle.c as number)
+        && (candle.h as number) >= (candle.l as number)
+        && (candle.v as number) >= 0;
+    });
+    if (!validCandles) {
+      setError(language === "th" ? "ข้อมูล OHLCV ไม่ถูกต้อง: ต้องมี t, o, h, l, c, v และค่าต้องสมเหตุสมผล" : "Invalid OHLCV data: require valid t, o, h, l, c, v values");
       return;
     }
     setBusy(true);
@@ -132,13 +169,29 @@ export default function App() {
         body: JSON.stringify({ symbol, timeframe, candles }),
         signal: controller.signal,
       });
-      const payload = await response.json() as ApiResult;
-      if (!response.ok) throw new Error(String(payload.error ?? payload.message ?? `HTTP ${response.status}`));
+      const responseText = await response.text();
+      let payload: ApiResult;
+      try {
+        const decoded: unknown = responseText.length ? JSON.parse(responseText) : {};
+        if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) {
+          throw new Error("Unexpected response shape");
+        }
+        payload = decoded as ApiResult;
+      } catch {
+        throw new Error(language === "th"
+          ? `NOVA API ส่งข้อมูลที่ไม่ใช่ JSON (HTTP ${response.status}) โปรดตรวจสอบ API URL และ Reverse Proxy`
+          : `NOVA API returned non-JSON content (HTTP ${response.status}). Check the API URL and reverse proxy.`);
+      }
+      if (!response.ok) {
+        throw new Error(language === "th"
+          ? `NOVA API ปฏิเสธคำขอ (HTTP ${response.status})`
+          : `NOVA API rejected the request (HTTP ${response.status})`);
+      }
       setResult(payload);
     } catch (cause) {
       setError(cause instanceof DOMException && cause.name === "AbortError"
         ? (language === "th" ? "หมดเวลารอ NOVA API (15 วินาที)" : "NOVA API timed out (15 seconds)")
-        : t.apiFailed);
+        : cause instanceof Error ? cause.message : t.apiFailed);
     } finally {
       window.clearTimeout(timeout);
       setBusy(false);
@@ -146,8 +199,19 @@ export default function App() {
   }
 
   async function signOut() {
-    await supabase?.auth.signOut();
-    setAccessToken(""); setResult(null); setView("overview");
+    try {
+      const { error: signOutError } = await supabase?.auth.signOut() ?? {};
+      if (signOutError) {
+        setError(language === "th" ? "ออกจากระบบไม่สำเร็จ" : "Sign-out failed");
+        return;
+      }
+      setAccessToken("");
+      setResult(null);
+      setView("overview");
+      setError("");
+    } catch {
+      setError(language === "th" ? "ไม่สามารถติดต่อ Supabase เพื่อออกจากระบบได้" : "Could not reach Supabase to sign out");
+    }
   }
 
   function content() {
