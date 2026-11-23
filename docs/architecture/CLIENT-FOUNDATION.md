@@ -1,59 +1,72 @@
-# VOOM AI Client Foundation
+# VOOM AI Client Architecture
 
-## Architecture decision
+## Architecture
 
-This repository is a monorepo with two independently built clients:
+This repository contains two independent clients:
 
-- `apps/android`: native Android application using Kotlin and Jetpack Compose.
-- `apps/web`: responsive web application using React, TypeScript, and Vite.
+- `apps/android`: Kotlin + Jetpack Compose.
+- `apps/web`: React + TypeScript + Vite.
 
-The clients share the versioned API contract, product terminology, safety rules, and design tokens documented in this repository. They do not share UI runtime code.
+Both clients use Supabase Auth for user identity and the NOVA AI Worker for authenticated, research-only chat. They do not share UI runtime code.
 
-## Current implementation status
+## Verified API contract in NOVA source
 
-- Web: initial Supabase email/password sign-in and versioned analysis request UI are present. Windows validation passed dependency installation (79 packages), TypeScript typecheck, and Vite production build (72 modules transformed).
-- Android: visual foundation only. Supabase Auth and NOVA Analysis API integration are **not implemented**. The primary action remains disabled.
-- Android configuration defaults are intentionally empty; placeholder hostnames and fake keys must not be treated as valid configuration.
-- Neither client is approved for production use.
+The NOVA repository documents the following authenticated route:
+
+- Method: `POST`
+- Path: `/api/chat`
+- Upstream: `https://voom-system-nova-ai.suwapat787.workers.dev`
+- Authentication: `Authorization: Bearer <Supabase user access token>`
+- Request: `{ "messages": [{ "role": "user" | "assistant", "content": "..." }] }`
+- Limits: 1–8 messages, max 1,200 characters per message, 8,000 total characters, JSON body max 16 KB.
+- Response: `message`, `provider`, `model`, `intent`, `executionEnabled:false`, `liveTradingEnabled:false`.
+
+The worker rejects unknown routes and validates the Supabase bearer token through Supabase Auth. It does not accept system-role messages or provide an order/execution tool. This is a chat/research contract, not a candle-analysis endpoint.
+
+## Client routing
+
+### Web
+- Browser calls only same-origin `POST /api/chat`.
+- `netlify/edge-functions/nova-chat.ts` forwards the request to the fixed NOVA Worker URL.
+- The proxy requires a Bearer token, accepts JSON only, enforces a 16 KB body limit, forwards no caller-selected upstream URL, and never logs tokens.
+- Local Vite development uses a fixed proxy to the same Worker and removes the localhost Origin header. The upstream still authenticates the bearer token.
+- Netlify routing/build configuration is in `netlify.toml`.
+
+### Android
+- Supabase email/password authentication uses the public publishable key and HTTPS.
+- The access token remains in memory only; it is not written to SharedPreferences or files.
+- Sign-out attempts to revoke the Supabase session and always clears the local token.
+- Chat requests go to the fixed NOVA AI Worker HTTPS endpoint with the user bearer token.
+- Messages are bounded to the worker contract and rendered as plain text.
 
 ## Trust boundaries
 
 1. Supabase Auth issues user-scoped access tokens.
-2. Each implemented client sends the user's access token to NOVA System Hub.
-3. NOVA validates the token and performs analysis.
-4. Client-supplied OHLCV is untrusted input. It is never labelled broker-verified.
-5. The clients do not contain service-role keys, broker credentials, or order execution capabilities.
+2. Each client sends the current user's access token to the NOVA AI Worker.
+3. The Worker validates the session through Supabase Auth before processing chat.
+4. AI output is untrusted content. Clients render it as text only; they do not evaluate HTML, JavaScript, or tool instructions.
+5. Service-role keys, broker credentials, tenant secrets, and privileged values remain server-side.
+6. Market Feed, account status, and MT5 Bridge status remain Not verified until an authenticated, owner-scoped data source confirms them.
 
-## Analysis API
+## Current implementation status
 
-- Method: `POST`
-- Path: `/v1/analysis/candles`
-- Authentication: `Authorization: Bearer <Supabase user access token>`
-- Contract: see the NOVA repository document `docs/architecture/VOOM-AI-ANALYSIS-API-V1.md`.
-
-The web client reads `VITE_NOVA_ANALYSIS_API_BASE_URL`. Android integration must use build-time public configuration and a user-scoped access token; no secrets belong in the APK.
+- Web: Supabase email/password session handling and authenticated chat request are implemented in source. Netlify Edge Function and Vite development proxy are added. Updated web build/typecheck and deployed route have not yet been verified.
+- Android: Supabase sign-in, in-memory access-token handling, sign-out, and NOVA AI chat are implemented in source. Updated Android compile/build and APK artifact have not yet been verified.
+- Neither client is approved for production use.
+- No real-time market feed or MT5 Bridge data path is implemented in this client foundation.
 
 ## Safety invariants
 
-- Live trading remains OFF.
-- No order submission, broker write, deposit, or withdrawal endpoints are implemented.
-- Paper Simulation must be explicitly labelled and must not imply a broker connection.
-- Missing or invalid credentials must fail closed.
-- Missing API configuration must produce a configuration error, not a fabricated response.
+- Live Trading remains OFF.
+- No order submission, broker write, deposit, withdrawal, or transfer endpoint is implemented.
+- No user-provided OHLCV is labelled broker-verified.
+- Missing/invalid credentials fail closed.
+- Chat output is informational/research-only and cannot grant execution authority.
 
 ## Development, CI, and release
 
 - Zero-cost strict; no paid service or billing activation is authorized.
-- GitHub Actions is permitted for bounded, verification-only CI.
-- Android CI builds a debug APK only; it does not sign, publish, deploy, or release.
-- Automatic PR validation is limited to PR opened/reopened events; subsequent checks are manually dispatched to control private-repository Actions usage.
-- GitHub Actions usage may consume included minutes/storage and could incur charges if account allowances are exceeded; monitor usage.
-- Local verification and manual review remain required.
-- Build, signing, installation, deployment, merge, and production release are separate gates requiring explicit approval.
-
-## Android CI status
-
-- Workflow: `.github/workflows/android-build.yml`.
-- Run #1 and Run #3 both ended in failure before any step summary was recorded.
-- The job-step endpoint returned an empty list and log download returned 404; no root cause can be established from available evidence.
-- No successful Android build or APK artifact is confirmed.
+- GitHub Actions is verification-only; Android CI builds a debug APK only.
+- CI usage must remain within existing account allowances.
+- Local verification is preferred where practical.
+- Build, signing, installation, deployment, merge, and production release remain separate gates requiring explicit approval.
