@@ -20,6 +20,7 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       actions: read
       contents: read
@@ -31,7 +32,7 @@ jobs:
           - language: javascript-typescript
             build-mode: none
           - language: java-kotlin
-            build-mode: autobuild
+            build-mode: manual
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,6 +42,31 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+
+      - name: Set up JDK 17
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        if: matrix.language == 'java-kotlin'
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK packages
+        if: matrix.language == 'java-kotlin'
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        if: matrix.language == 'java-kotlin'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build Android app for CodeQL extraction
+        if: matrix.language == 'java-kotlin'
+        run: gradle --no-daemon -p apps/android assembleDebug
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
