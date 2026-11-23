@@ -43,8 +43,9 @@ export default async function handler(request: Request): Promise<Response> {
   } catch {
     return json({ error: "invalid_json" }, 400);
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return json({ error: "invalid_json_object" }, 400);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)
+      || !Array.isArray((parsed as { messages?: unknown }).messages)) {
+    return json({ error: "invalid_messages" }, 400);
   }
 
   try {
@@ -76,4 +77,3 @@ export default async function handler(request: Request): Promise<Response> {
   }
 }
 
-export const config = { path: "/api/chat" };
