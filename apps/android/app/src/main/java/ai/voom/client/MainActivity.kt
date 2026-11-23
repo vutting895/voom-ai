@@ -101,12 +101,30 @@ private fun VoomApp() {
     }
 
     fun signOut() {
-        accessToken = ""
-        password = ""
-        chatInput = ""
-        chatMessages = emptyList()
-        error = ""
-        screen = Screen.OVERVIEW
+        val token = accessToken
+        if (token.isBlank()) {
+            accessToken = ""
+            password = ""
+            chatInput = ""
+            chatMessages = emptyList()
+            error = ""
+            screen = Screen.OVERVIEW
+            return
+        }
+        authBusy = true
+        NovaApi.signOut(token) { failure ->
+            authBusy = false
+            accessToken = ""
+            password = ""
+            chatInput = ""
+            chatMessages = emptyList()
+            screen = Screen.OVERVIEW
+            error = if (failure == null) "" else if (thai) {
+                "ล้าง Session ในแอปแล้ว แต่ยืนยันการออกจากระบบกับ Supabase ไม่ได้"
+            } else {
+                "Local session cleared; Supabase sign-out could not be confirmed"
+            }
+        }
     }
 
     fun sendMessage() {
@@ -187,7 +205,14 @@ private fun VoomApp() {
                             if (accessToken.isBlank()) {
                                 AuthPanel(email, { email = it }, password, { password = it }, authBusy, error, thai, { signIn() })
                             } else {
-                                StatusCard("SUPABASE AUTH", if (thai) "เข้าสู่ระบบแล้ว (Session อยู่ในหน่วยความจำเท่านั้น)" else "Signed in (session held in memory only)", thai)
+                                Surface(color = Panel, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Border, RoundedCornerShape(14.dp))) {
+                                    Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                        Text("SUPABASE AUTH", color = Muted, fontSize = 9.sp, letterSpacing = 1.2.sp)
+                                        Text(if (thai) "ได้รับ User Access Token แล้ว" else "User access token received", color = TextMain, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                        Text(if (thai) "เก็บ Session ในหน่วยความจำเท่านั้น" else "Session is held in memory only", color = Muted, fontSize = 10.sp)
+                                        StatusPill(if (thai) "Authenticated" else "Authenticated", Cyan)
+                                    }
+                                }
                             }
                             StatusCard("NOVA CORE", if (thai) "ระบบวิเคราะห์หลัก" else "Analysis engine", thai)
                             StatusCard("MT5 BRIDGE", if (thai) "การเชื่อมต่อ MetaTrader 5" else "MetaTrader 5 connection", thai)
