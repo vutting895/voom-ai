@@ -24,6 +24,7 @@ async function getJson(path, accessToken, fetchImpl = fetch) {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
     cache: "no-store",
+    signal: AbortSignal.timeout(12_000),
   });
   const text = await response.text();
   let payload;
@@ -49,9 +50,16 @@ export async function fetchCoreSnapshot(accessToken, fetchImpl = fetch) {
   if (!Array.isArray(registry.integrations) || !Array.isArray(connectionList.connections)) {
     throw new Error("NOVA Core response is missing integration or connection records");
   }
+  const safeConnections = connectionList.connections.filter(isRecord);
+  if (safeConnections.some(connection =>
+    connection.ordersEnabled !== false || connection.liveTradingEnabled !== false ||
+    ("executionEnabled" in connection && connection.executionEnabled !== false)
+  )) {
+    throw new Error("A NOVA Core connection did not confirm read-only safety flags");
+  }
   return {
     integrations: registry.integrations.filter(isRecord),
-    connections: connectionList.connections.filter(isRecord),
+    connections: safeConnections,
     mode: typeof registry.mode === "string" ? registry.mode : "unknown",
   };
 }
