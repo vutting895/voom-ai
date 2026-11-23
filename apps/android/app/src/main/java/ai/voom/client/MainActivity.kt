@@ -95,6 +95,7 @@ private fun VoomApp() {
                 error = ""
                 screen = Screen.ANALYSIS
             } else {
+                password = ""
                 error = failure ?: if (thai) "เข้าสู่ระบบไม่สำเร็จ" else "Sign-in failed"
             }
         }
