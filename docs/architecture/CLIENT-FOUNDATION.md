@@ -11,7 +11,7 @@ The clients share the versioned API contract, product terminology, safety rules,
 
 ## Current implementation status
 
-- Web: initial Supabase email/password sign-in and versioned analysis request UI are present on the feature branch. They have not yet been verified by a clean dependency install, typecheck, or production build.
+- Web: initial Supabase email/password sign-in and versioned analysis request UI are present. Windows validation passed dependency installation (79 packages), TypeScript typecheck, and Vite production build (72 modules transformed).
 - Android: visual foundation only. Supabase Auth and NOVA Analysis API integration are **not implemented**. The primary action remains disabled.
 - Android configuration defaults are intentionally empty; placeholder hostnames and fake keys must not be treated as valid configuration.
 - Neither client is approved for production use.
@@ -41,9 +41,19 @@ The web client reads `VITE_NOVA_ANALYSIS_API_BASE_URL`. Android integration must
 - Missing or invalid credentials must fail closed.
 - Missing API configuration must produce a configuration error, not a fabricated response.
 
-## Development and release
+## Development, CI, and release
 
-- Zero-cost strict.
-- No CI/CD workflows.
-- Local verification and manual review only.
+- Zero-cost strict; no paid service or billing activation is authorized.
+- GitHub Actions is permitted for bounded, verification-only CI.
+- Android CI builds a debug APK only; it does not sign, publish, deploy, or release.
+- Automatic PR validation is limited to PR opened/reopened events; subsequent checks are manually dispatched to control private-repository Actions usage.
+- GitHub Actions usage may consume included minutes/storage and could incur charges if account allowances are exceeded; monitor usage.
+- Local verification and manual review remain required.
 - Build, signing, installation, deployment, merge, and production release are separate gates requiring explicit approval.
+
+## Android CI status
+
+- Workflow: `.github/workflows/android-build.yml`.
+- Run #1 and Run #3 both ended in failure before any step summary was recorded.
+- The job-step endpoint returned an empty list and log download returned 404; no root cause can be established from available evidence.
+- No successful Android build or APK artifact is confirmed.
