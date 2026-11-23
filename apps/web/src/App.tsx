@@ -199,8 +199,14 @@ export default function App() {
   }
 
   async function signOut() {
+    if (!supabase) {
+      setAccessToken("");
+      setResult(null);
+      setView("overview");
+      return;
+    }
     try {
-      const { error: signOutError } = await supabase?.auth.signOut() ?? {};
+      const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) {
         setError(language === "th" ? "ออกจากระบบไม่สำเร็จ" : "Sign-out failed");
         return;
