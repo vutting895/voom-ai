@@ -13,8 +13,6 @@ internal class AuthOperationGate {
         return operationId
     }
 
-    @Synchronized
-    fun currentId(): Int = operationId
 
     @Synchronized
     fun isCurrent(candidate: Int): Boolean = candidate == operationId
