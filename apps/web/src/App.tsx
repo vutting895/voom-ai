@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type Language = "th" | "en";
@@ -88,6 +88,7 @@ export default function App() {
   const [result, setResult] = useState<ApiResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const chatAbortRef = useRef<AbortController | null>(null);
   const t = copy[language];
 
   useEffect(() => {
@@ -98,7 +99,17 @@ export default function App() {
     }).catch(() => {
       setError(language === "th" ? "ไม่สามารถเชื่อมต่อ Supabase Auth ได้" : "Unable to connect to Supabase Auth");
     });
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => setAccessToken(session?.access_token ?? ""));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccessToken(session?.access_token ?? "");
+      if (!session) {
+        chatAbortRef.current?.abort();
+        chatAbortRef.current = null;
+        setBusy(false);
+        setResult(null);
+        setChatMessages([]);
+        setChatInput("");
+      }
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 
@@ -141,7 +152,9 @@ export default function App() {
       return;
     }
     setBusy(true);
+    chatAbortRef.current?.abort();
     const controller = new AbortController();
+    chatAbortRef.current = controller;
     const timeout = window.setTimeout(() => controller.abort(), 15000);
     try {
       const response = await fetch("/api/chat", {
@@ -174,16 +187,24 @@ export default function App() {
       setResult(payload);
       setChatInput("");
     } catch (cause) {
-      setError(cause instanceof DOMException && cause.name === "AbortError"
-        ? (language === "th" ? "หมดเวลารอ NOVA AI (15 วินาที)" : "NOVA AI timed out (15 seconds)")
-        : cause instanceof Error ? cause.message : t.apiFailed);
+      if (!controller.signal.aborted) {
+        setError(cause instanceof DOMException && cause.name === "AbortError"
+          ? (language === "th" ? "หมดเวลารอ NOVA AI (15 วินาที)" : "NOVA AI timed out (15 seconds)")
+          : cause instanceof Error ? cause.message : t.apiFailed);
+      }
     } finally {
       window.clearTimeout(timeout);
-      setBusy(false);
+      if (chatAbortRef.current === controller) {
+        chatAbortRef.current = null;
+        setBusy(false);
+      }
     }
   }
 
   async function signOut() {
+    chatAbortRef.current?.abort();
+    chatAbortRef.current = null;
+    setBusy(false);
     let remoteSignOutFailed = false;
     if (supabase) {
       try {
