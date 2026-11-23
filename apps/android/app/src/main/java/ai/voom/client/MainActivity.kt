@@ -108,18 +108,20 @@ private fun VoomApp() {
     }
 
     fun signOut() {
+        // Invalidate pending sign-in/refresh/chat callbacks even when no token exists.
+        val operationId = authOperations.begin()
         val token = accessToken
         authSession = null
         password = ""
         chatInput = ""
         chatMessages = emptyList()
         chatBusy = false
+        authBusy = false
         error = ""
         screen = Screen.OVERVIEW
         if (token.isBlank()) return
 
         // Invalidate local UI state immediately; the remote revoke is best-effort.
-        val operationId = authOperations.begin()
         authBusy = true
         NovaApi.signOut(token) { failure ->
             // A late sign-out response must not overwrite a newer sign-in state.
