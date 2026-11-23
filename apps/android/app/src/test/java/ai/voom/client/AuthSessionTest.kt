@@ -22,6 +22,13 @@ class AuthSessionTest {
         assertFalse(gate.isCurrent(pendingRefresh))
     }
 
+    @Test fun signOutWithoutSessionInvalidatesPendingSignIn() {
+        val gate = AuthOperationGate()
+        val pendingSignIn = gate.begin()
+        gate.begin() // local sign-out must invalidate even before a token exists
+        assertFalse(gate.isCurrent(pendingSignIn))
+    }
+
     @Test fun sessionOutsideSafetyWindowDoesNotRefresh() {
         assertFalse(AuthSession("a", "r", 1_000L).shouldRefresh(900L))
     }
