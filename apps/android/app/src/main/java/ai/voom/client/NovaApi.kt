@@ -4,6 +4,8 @@ import android.os.Handler
 import android.os.Looper
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -13,7 +15,27 @@ data class NovaChatReply(val message: String, val provider: String, val model: S
 object NovaApi {
     private const val CONNECT_TIMEOUT_MS = 8000
     private const val READ_TIMEOUT_MS = 16000
+    private const val MAX_RESPONSE_BYTES = 64 * 1024
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun readBoundedText(stream: InputStream?): String {
+        if (stream == null) return ""
+        return stream.use { input ->
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(8192)
+            var total = 0
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                total += count
+                if (total > MAX_RESPONSE_BYTES) {
+                    throw IllegalStateException("Server response exceeded the allowed size")
+                }
+                output.write(buffer, 0, count)
+            }
+            output.toString(Charsets.UTF_8.name())
+        }
+    }
 
     fun signIn(email: String, password: String, callback: (String?, String?) -> Unit) {
         Thread {
@@ -39,8 +61,7 @@ object NovaApi {
                     val body = JSONObject().put("email", email.trim()).put("password", password).toString()
                     connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                     val status = connection.responseCode
-                    val response = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                        ?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    val response = readBoundedText(if (status in 200..299) connection.inputStream else connection.errorStream)
                     if (status !in 200..299) {
                         error = if (status == 400 || status == 401) "Email or password is incorrect" else "Supabase Auth returned HTTP $status"
                     } else {
@@ -122,8 +143,7 @@ object NovaApi {
                 try {
                     connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
                     val status = connection.responseCode
-                    val response = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                        ?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    val response = readBoundedText(if (status in 200..299) connection.inputStream else connection.errorStream)
                     if (status !in 200..299) {
                         error = when (status) {
                             401 -> "Session expired. Sign in again."
