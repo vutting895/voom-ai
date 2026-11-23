@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type Language = "th" | "en";
+type View = "overview" | "market" | "analysis" | "bridge";
 type ApiResult = Record<string, unknown>;
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -13,27 +14,72 @@ const supabase: SupabaseClient | null = supabaseUrl && supabaseAnonKey
 
 const copy = {
   th: {
-    subtitle: "ระบบวิเคราะห์ตลาดจาก NOVA Core",
-    readonly: "READ-ONLY · LIVE TRADING OFF",
-    email: "อีเมล", password: "รหัสผ่าน", signIn: "เข้าสู่ระบบ", signOut: "ออกจากระบบ",
-    symbol: "Symbol", timeframe: "Timeframe", candles: "OHLCV JSON (35–500 แท่ง)",
-    analyze: "วิเคราะห์", config: "ยังไม่ได้ตั้งค่า Supabase หรือ NOVA API URL",
-    authRequired: "กรุณาเข้าสู่ระบบก่อนวิเคราะห์", result: "ผลการวิเคราะห์",
-    paper: "Paper Simulation เท่านั้น · ไม่ส่งคำสั่งซื้อขาย",
+    subtitle: "พื้นที่ควบคุมและวิเคราะห์ตลาดจาก NOVA Core",
+    liveOff: "ปิดการเทรดจริง",
+    overview: "ภาพรวม", market: "ตลาด", analysis: "ผลวิเคราะห์", bridge: "การเชื่อมต่อ",
+    workspace: "พื้นที่ทำงาน", welcome: "ภาพรวมระบบ", overviewHint: "ตรวจสอบความพร้อมของระบบก่อนเริ่มวิเคราะห์",
+    core: "NOVA CORE", bridgeStatus: "MT5 BRIDGE", feed: "MARKET DATA", mode: "TRADING MODE",
+    unverified: "ยังไม่ยืนยัน", notConnected: "ยังไม่มีข้อมูลการเชื่อมต่อ",
+    readonly: "READ-ONLY", paper: "PAPER SIMULATION", off: "OFF",
+    marketTitle: "ตลาดที่ติดตาม", marketHint: "ข้อมูลราคาจะแสดงเมื่อเชื่อมต่อแหล่งข้อมูลที่ตรวจสอบได้",
+    symbol: "SYMBOL", waiting: "รอข้อมูลตลาด", noFeed: "ยังไม่มี Market Feed",
+    analysisTitle: "การวิเคราะห์ล่าสุด", analysisHint: "ผลวิเคราะห์จะปรากฏเมื่อ NOVA API ส่งข้อมูลกลับมา",
+    noAnalysis: "ยังไม่มีผลวิเคราะห์", noAnalysisHint: "เชื่อมต่อ NOVA Core และส่งข้อมูล OHLCV ที่ต้องการวิเคราะห์",
+    bridgeTitle: "สถานะการเชื่อมต่อ", bridgeHint: "สถานะจะแสดงจาก Heartbeat ที่ตรวจสอบได้เท่านั้น",
+    coreDesc: "ระบบวิเคราะห์หลัก", bridgeDesc: "การเชื่อมต่อ MetaTrader 5",
+    activity: "กิจกรรมล่าสุด", noActivity: "ยังไม่มีกิจกรรม", safety: "ขอบเขตความปลอดภัย",
+    safetyText: "หน้านี้ใช้สำหรับดูข้อมูลและวิเคราะห์เท่านั้น ไม่มีการส่งคำสั่งซื้อขายหรือแก้ไขบัญชีโบรกเกอร์",
+    signIn: "เข้าสู่ระบบ", email: "อีเมล", password: "รหัสผ่าน", signOut: "ออกจากระบบ",
+    config: "ยังไม่ได้ตั้งค่า Supabase หรือ NOVA API URL", authRequired: "กรุณาเข้าสู่ระบบก่อนวิเคราะห์",
+    analyze: "วิเคราะห์ข้อมูล", candles: "ข้อมูล OHLCV JSON", timeframe: "กรอบเวลา",
+    result: "ผลการวิเคราะห์", invalidJson: "รูปแบบ JSON ไม่ถูกต้อง", apiFailed: "ไม่สามารถเรียก NOVA Analysis API ได้",
+    footer: "VOOM AI · Powered by NOVA", language: "EN",
   },
   en: {
-    subtitle: "Market analysis powered by NOVA Core",
-    readonly: "READ-ONLY · LIVE TRADING OFF",
-    email: "Email", password: "Password", signIn: "Sign in", signOut: "Sign out",
-    symbol: "Symbol", timeframe: "Timeframe", candles: "OHLCV JSON (35–500 candles)",
-    analyze: "Analyze", config: "Supabase or NOVA API URL is not configured",
-    authRequired: "Sign in before requesting analysis", result: "Analysis result",
-    paper: "Paper Simulation only · No trade orders",
+    subtitle: "Market intelligence workspace powered by NOVA Core",
+    liveOff: "LIVE TRADING OFF",
+    overview: "Overview", market: "Markets", analysis: "Analysis", bridge: "Connections",
+    workspace: "WORKSPACE", welcome: "System overview", overviewHint: "Check system readiness before requesting analysis",
+    core: "NOVA CORE", bridgeStatus: "MT5 BRIDGE", feed: "MARKET DATA", mode: "TRADING MODE",
+    unverified: "Not verified", notConnected: "No connection data available",
+    readonly: "READ-ONLY", paper: "PAPER SIMULATION", off: "OFF",
+    marketTitle: "Watchlist", marketHint: "Prices appear only after a verifiable market source is connected",
+    symbol: "SYMBOL", waiting: "Awaiting market data", noFeed: "No market feed connected",
+    analysisTitle: "Latest analysis", analysisHint: "Analysis appears when NOVA API returns verified response data",
+    noAnalysis: "No analysis yet", noAnalysisHint: "Connect NOVA Core and provide OHLCV data to analyze",
+    bridgeTitle: "Connection status", bridgeHint: "Status is shown only from a verifiable heartbeat",
+    coreDesc: "Analysis engine", bridgeDesc: "MetaTrader 5 connection",
+    activity: "Recent activity", noActivity: "No activity recorded", safety: "Safety boundary",
+    safetyText: "This workspace is for monitoring and analysis only. It cannot submit trades or modify broker accounts.",
+    signIn: "Sign in", email: "Email", password: "Password", signOut: "Sign out",
+    config: "Supabase or NOVA API URL is not configured", authRequired: "Sign in before requesting analysis",
+    analyze: "Analyze data", candles: "OHLCV JSON data", timeframe: "Timeframe",
+    result: "Analysis result", invalidJson: "Invalid JSON format", apiFailed: "NOVA Analysis API request failed",
+    footer: "VOOM AI · Powered by NOVA", language: "TH",
   },
 } satisfies Record<Language, Record<string, string>>;
 
+const nav: { id: View; icon: string }[] = [
+  { id: "overview", icon: "◫" },
+  { id: "market", icon: "⌁" },
+  { id: "analysis", icon: "⌗" },
+  { id: "bridge", icon: "⇄" },
+];
+
+function Brand() {
+  return <div className="brand">
+    <span className="brand-mark" aria-hidden="true">V</span>
+    <span className="brand-copy"><strong>VOOM AI</strong><small>POWERED BY NOVA</small></span>
+  </div>;
+}
+
+function StatusTag({ children, tone = "muted" }: { children: string; tone?: "muted" | "info" | "warning" }) {
+  return <span className={`status-tag status-${tone}`}><i aria-hidden="true" />{children}</span>;
+}
+
 export default function App() {
   const [language, setLanguage] = useState<Language>("th");
+  const [view, setView] = useState<View>("overview");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [accessToken, setAccessToken] = useState("");
@@ -52,75 +98,154 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    document.title = `VOOM AI · ${t.overview}`;
+  }, [t.overview]);
+
   async function signIn(event: FormEvent) {
     event.preventDefault();
-    if (!supabase) return setError(t.config);
+    if (!supabase) { setError(t.config); return; }
     setBusy(true); setError("");
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (authError) setError(authError.message);
+    if (authError) setError(language === "th" ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง" : "Email or password is incorrect");
     setPassword("");
   }
 
   async function analyze(event: FormEvent) {
     event.preventDefault(); setError(""); setResult(null);
-    if (!accessToken) return setError(t.authRequired);
-    if (!apiBaseUrl) return setError(t.config);
+    if (!accessToken) { setError(t.authRequired); return; }
+    if (!apiBaseUrl) { setError(t.config); return; }
     let candles: unknown;
-    try { candles = JSON.parse(candlesJson); } catch { return setError("Invalid JSON"); }
+    try { candles = JSON.parse(candlesJson); } catch { setError(t.invalidJson); return; }
+    if (!Array.isArray(candles) || candles.length < 35 || candles.length > 500) {
+      setError(language === "th" ? "ต้องส่งข้อมูลแท่งเทียน 35–500 แท่ง" : "Provide between 35 and 500 candles");
+      return;
+    }
     setBusy(true);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
     try {
       const response = await fetch(`${apiBaseUrl}/v1/analysis/candles`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ symbol, timeframe, candles }),
+        signal: controller.signal,
       });
       const payload = await response.json() as ApiResult;
       if (!response.ok) throw new Error(String(payload.error ?? payload.message ?? `HTTP ${response.status}`));
       setResult(payload);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Analysis request failed");
-    } finally { setBusy(false); }
+      setError(cause instanceof DOMException && cause.name === "AbortError"
+        ? (language === "th" ? "หมดเวลารอ NOVA API (15 วินาที)" : "NOVA API timed out (15 seconds)")
+        : t.apiFailed);
+    } finally {
+      window.clearTimeout(timeout);
+      setBusy(false);
+    }
   }
 
   async function signOut() {
     await supabase?.auth.signOut();
-    setAccessToken(""); setResult(null);
+    setAccessToken(""); setResult(null); setView("overview");
   }
 
-  return <main className="shell">
-    <header className="topbar">
-      <div className="brand"><span className="brand-mark">V</span><div><strong>VOOM AI</strong><small>POWERED BY NOVA</small></div></div>
-      <div className="top-actions">
-        <button className="lang" onClick={() => setLanguage(language === "th" ? "en" : "th")}>{language === "th" ? "EN" : "TH"}</button>
-        {accessToken && <button className="secondary" onClick={signOut}>{t.signOut}</button>}
+  function content() {
+    if (view === "market") return <section className="panel market-panel">
+      <div className="section-heading"><div><span className="eyebrow">{t.workspace}</span><h2>{t.marketTitle}</h2><p>{t.marketHint}</p></div><StatusTag>{t.unverified}</StatusTag></div>
+      <div className="market-empty">
+        <div className="market-glyph" aria-hidden="true">⌁</div>
+        <strong>{t.noFeed}</strong><span>{t.waiting}</span>
+        <div className="symbol-chip"><span>{t.symbol}</span><b>XAUUSDm</b><StatusTag>{t.unverified}</StatusTag></div>
       </div>
-    </header>
-    <section className="hero">
-      <div className="eyebrow">NOVA SYSTEM HUB</div>
-      <h1>VOOM AI</h1><p>{t.subtitle}</p>
-      <div className="status">{t.readonly}</div>
-    </section>
-    {!accessToken ? <section className="panel auth-panel">
-      <h2>{t.signIn}</h2>
-      <form onSubmit={signIn} className="stack">
-        <label>{t.email}<input type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} required /></label>
-        <label>{t.password}<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required /></label>
-        <button className="primary" disabled={busy || !supabase}>{t.signIn}</button>
-      </form>
-    </section> : <section className="panel">
-      <h2>{t.result}</h2>
-      <form onSubmit={analyze} className="stack">
-        <div className="fields">
-          <label>{t.symbol}<input value={symbol} onChange={e => setSymbol(e.target.value)} required maxLength={40} /></label>
+    </section>;
+
+    if (view === "analysis") return <section className="panel">
+      <div className="section-heading"><div><span className="eyebrow">{t.workspace}</span><h2>{t.analysisTitle}</h2><p>{t.analysisHint}</p></div></div>
+      <form className="analysis-form" onSubmit={analyze} noValidate>
+        <div className="form-grid">
+          <label>{t.symbol}<input value={symbol} onChange={e => setSymbol(e.target.value)} maxLength={40} /></label>
           <label>{t.timeframe}<select value={timeframe} onChange={e => setTimeframe(e.target.value)}>{["M1","M5","M15","M30","H1","H4","D1"].map(v => <option key={v}>{v}</option>)}</select></label>
         </div>
-        <label>{t.candles}<textarea value={candlesJson} onChange={e => setCandlesJson(e.target.value)} rows={9} placeholder='[{"t":"2026-01-01T00:00:00Z","o":...,"h":...,"l":...,"c":...,"v":...}]' required /></label>
-        <button className="primary" disabled={busy || !candlesJson.trim()}>{busy ? "…" : t.analyze}</button>
+        <label>{t.candles}<textarea value={candlesJson} onChange={e => setCandlesJson(e.target.value)} rows={7} placeholder='[{"t":"2026-01-01T00:00:00Z","o":...,"h":...,"l":...,"c":...,"v":...}]' /></label>
+        <div className="form-actions"><span>{language === "th" ? "ข้อมูลจากผู้ใช้ยังไม่ถือเป็นข้อมูลที่ Broker ยืนยัน" : "User-provided data is not broker-verified"}</span><button className="button-primary" disabled={busy || !candlesJson.trim()}>{busy ? (language === "th" ? "กำลังวิเคราะห์…" : "Analyzing…") : t.analyze}</button></div>
       </form>
-      {result && <pre className="result">{JSON.stringify(result, null, 2)}</pre>}
-    </section>}
-    {error && <p className="error" role="alert">{error}</p>}
-    <footer>{t.paper}<br /><span>Client-supplied OHLCV is unverified input. Analysis is informational, not a trade instruction.</span></footer>
+      {error && <p className="inline-error" role="alert">{error}</p>}
+      {result && <div className="result-block"><h3>{t.result}</h3><pre>{JSON.stringify(result, null, 2)}</pre></div>}
+      {!result && !error && <div className="empty-inline"><span className="empty-icon">⌗</span><strong>{t.noAnalysis}</strong><p>{t.noAnalysisHint}</p></div>}
+    </section>;
+
+    if (view === "bridge") return <section className="panel">
+      <div className="section-heading"><div><span className="eyebrow">{t.workspace}</span><h2>{t.bridgeTitle}</h2><p>{t.bridgeHint}</p></div></div>
+      <div className="connection-list">
+        <div className="connection-row"><span className="connection-icon">N</span><div><strong>NOVA Core</strong><small>{t.coreDesc}</small></div><StatusTag>{t.unverified}</StatusTag></div>
+        <div className="connection-row"><span className="connection-icon">M</span><div><strong>MT5 Bridge</strong><small>{t.bridgeDesc}</small></div><StatusTag>{t.unverified}</StatusTag></div>
+      </div>
+      <div className="notice"><b>{t.notConnected}</b><span>{t.bridgeHint}</span></div>
+    </section>;
+
+    return <div className="dashboard-grid">
+      <section className="panel welcome-panel">
+        <div className="signal-rail" aria-hidden="true"><span /></div>
+        <div className="welcome-copy"><span className="eyebrow">{t.workspace}</span><h2>{t.welcome}</h2><p>{t.overviewHint}</p></div>
+        <div className="welcome-status"><span>{t.mode}</span><strong>{t.readonly}</strong><StatusTag tone="warning">{t.liveOff}</StatusTag></div>
+      </section>
+      <section className="status-grid" aria-label={t.bridgeTitle}>
+        <article className="status-card"><div className="card-top"><span>{t.core}</span><span className="mini-icon">N</span></div><strong className="status-value">{t.unverified}</strong><p>{t.notConnected}</p><StatusTag>{t.unverified}</StatusTag></article>
+        <article className="status-card"><div className="card-top"><span>{t.bridgeStatus}</span><span className="mini-icon">M</span></div><strong className="status-value">{t.unverified}</strong><p>{t.bridgeDesc}</p><StatusTag>{t.unverified}</StatusTag></article>
+        <article className="status-card"><div className="card-top"><span>{t.feed}</span><span className="mini-icon">⌁</span></div><strong className="status-value">{t.unverified}</strong><p>{t.marketHint}</p><StatusTag>{t.unverified}</StatusTag></article>
+      </section>
+      <section className="panel market-panel">
+        <div className="section-heading"><div><span className="eyebrow">{t.workspace}</span><h2>{t.marketTitle}</h2><p>{t.marketHint}</p></div><button className="text-button" onClick={() => setView("market")}>{t.market} ↗</button></div>
+        <div className="market-empty compact">
+          <div className="market-glyph" aria-hidden="true">⌁</div><strong>{t.noFeed}</strong><span>{t.waiting}</span>
+          <div className="symbol-chip"><span>{t.symbol}</span><b>XAUUSDm</b><StatusTag>{t.unverified}</StatusTag></div>
+        </div>
+      </section>
+      <section className="panel side-panel">
+        <div className="section-heading"><div><span className="eyebrow">{t.workspace}</span><h2>{t.activity}</h2></div></div>
+        <div className="activity-empty"><span className="activity-mark">—</span><strong>{t.noActivity}</strong><p>{t.noAnalysisHint}</p></div>
+        <div className="safety-note"><span className="safety-mark">i</span><div><strong>{t.safety}</strong><p>{t.safetyText}</p></div></div>
+      </section>
+    </div>;
+  }
+
+  if (!accessToken) return <main className="auth-shell">
+    <div className="auth-brand"><Brand /><StatusTag tone="warning">{t.liveOff}</StatusTag></div>
+    <section className="auth-card">
+      <span className="eyebrow">NOVA SYSTEM HUB</span><h1>{t.signIn}</h1>
+      <p>{t.subtitle}</p>
+      <form className="auth-form" onSubmit={signIn} noValidate>
+        <label>{t.email}<input type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} required /></label>
+        <label>{t.password}<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} required /></label>
+        {!supabase && <p className="inline-error">{t.config}</p>}
+        {error && <p className="inline-error" role="alert">{error}</p>}
+        <button className="button-primary" disabled={busy || !supabase}>{busy ? "…" : t.signIn}</button>
+      </form>
+      <div className="auth-foot">{t.safetyText}</div>
+    </section>
+    <footer className="app-footer">{t.footer}</footer>
   </main>;
+
+  return <div className="app-shell">
+    <aside className="sidebar">
+      <Brand />
+      <div className="sidebar-label">{t.workspace}</div>
+      <nav className="side-nav" aria-label={t.workspace}>
+        {nav.map(item => <button key={item.id} className={view === item.id ? "nav-item active" : "nav-item"} onClick={() => { setView(item.id); setError(""); }} aria-current={view === item.id ? "page" : undefined}><span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{t[item.id]}</span></button>)}
+      </nav>
+      <div className="sidebar-bottom"><StatusTag tone="warning">{t.liveOff}</StatusTag><small>v0.1 · READ-ONLY</small></div>
+    </aside>
+    <main className="main-area">
+      <header className="topbar">
+        <div><span className="eyebrow">{t.workspace}</span><h1>{t[view]}</h1></div>
+        <div className="top-actions"><span className="user-label">{email || "NOVA User"}</span><button className="utility-button" onClick={() => setLanguage(language === "th" ? "en" : "th")} aria-label="Change language">{t.language}</button><button className="utility-button" onClick={signOut}>{t.signOut}</button></div>
+      </header>
+      <div className="page-content">{content()}</div>
+      <footer className="main-footer"><span>{t.footer}</span><span>{t.readonly} · {t.paper}</span></footer>
+    </main>
+    <nav className="mobile-nav" aria-label={t.workspace}>
+      {nav.map(item => <button key={item.id} className={view === item.id ? "mobile-nav-item active" : "mobile-nav-item"} onClick={() => { setView(item.id); setError(""); }} aria-current={view === item.id ? "page" : undefined}><span aria-hidden="true">{item.icon}</span><small>{t[item.id]}</small></button>)}
+    </nav>
+  </div>;
 }
