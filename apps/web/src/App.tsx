@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { AuthLifecycle } from "./authLifecycle.js";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type Language = "th" | "en";
@@ -89,30 +90,27 @@ export default function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const chatAbortRef = useRef<AbortController | null>(null);
-  const authGenerationRef = useRef(0);
-  const userIdRef = useRef<string | null>(null);
+  const authLifecycleRef = useRef(new AuthLifecycle());
   const t = copy[language];
 
   useEffect(() => {
     if (!supabase) return;
-    const initialGeneration = authGenerationRef.current;
+    const initialSnapshot = authLifecycleRef.current.snapshot();
     void supabase.auth.getSession().then(({ data, error: sessionError }) => {
       // A late initial-session lookup must not overwrite a newer auth event.
-      if (authGenerationRef.current !== initialGeneration) return;
+      if (!authLifecycleRef.current.isCurrent(initialSnapshot)) return;
       if (sessionError) setError(language === "th" ? "ไม่สามารถกู้คืนสถานะการเข้าสู่ระบบได้" : "Unable to restore the sign-in session");
-      userIdRef.current = data.session?.user.id ?? null;
+      authLifecycleRef.current.setUserId(data.session?.user.id ?? null);
       setAccessToken(data.session?.access_token ?? "");
     }).catch(() => {
-      if (authGenerationRef.current === initialGeneration) {
+      if (authLifecycleRef.current.isCurrent(initialSnapshot)) {
         setError(language === "th" ? "ไม่สามารถเชื่อมต่อ Supabase Auth ได้" : "Unable to connect to Supabase Auth");
       }
     });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       const nextUserId = session?.user.id ?? null;
-      if (userIdRef.current !== nextUserId) {
+      if (authLifecycleRef.current.setUserId(nextUserId)) {
         // Account changes invalidate all in-flight chat work and user-scoped UI state.
-        userIdRef.current = nextUserId;
-        authGenerationRef.current += 1;
         chatAbortRef.current?.abort();
         chatAbortRef.current = null;
         setBusy(false);
@@ -125,7 +123,7 @@ export default function App() {
     });
     return () => {
       data.subscription.unsubscribe();
-      authGenerationRef.current += 1;
+      authLifecycleRef.current.invalidate();
       chatAbortRef.current?.abort();
     };
   }, []);
@@ -169,8 +167,7 @@ export default function App() {
       return;
     }
     setBusy(true);
-    const requestGeneration = authGenerationRef.current;
-    const requestUserId = userIdRef.current;
+    const requestSnapshot = authLifecycleRef.current.snapshot();
     chatAbortRef.current?.abort();
     const controller = new AbortController();
     chatAbortRef.current = controller;
@@ -202,14 +199,13 @@ export default function App() {
       if (typeof payload.message !== "string" || !payload.message.trim()) {
         throw new Error(language === "th" ? "NOVA AI ไม่ได้ส่งข้อความตอบกลับที่ถูกต้อง" : "NOVA AI returned an invalid message");
       }
-      if (authGenerationRef.current !== requestGeneration || userIdRef.current !== requestUserId) return;
+      if (!authLifecycleRef.current.isCurrent(requestSnapshot)) return;
       setChatMessages([...requestMessages, { role: "assistant" as const, content: payload.message }].slice(-8));
       setResult(payload);
       setChatInput("");
     } catch (cause) {
       if (chatAbortRef.current === controller &&
-          authGenerationRef.current === requestGeneration &&
-          userIdRef.current === requestUserId) {
+          authLifecycleRef.current.isCurrent(requestSnapshot)) {
         setError(cause instanceof DOMException && cause.name === "AbortError"
           ? (language === "th" ? "หมดเวลารอ NOVA AI (15 วินาที)" : "NOVA AI timed out (15 seconds)")
           : cause instanceof Error ? cause.message : t.apiFailed);
@@ -218,16 +214,13 @@ export default function App() {
       window.clearTimeout(timeout);
       if (chatAbortRef.current === controller) {
         chatAbortRef.current = null;
-        if (authGenerationRef.current === requestGeneration &&
-            userIdRef.current === requestUserId) setBusy(false);
+        if (authLifecycleRef.current.isCurrent(requestSnapshot)) setBusy(false);
       }
     }
   }
 
   async function signOut() {
-    authGenerationRef.current += 1;
-    const signOutGeneration = authGenerationRef.current;
-    userIdRef.current = null;
+    const signOutSnapshot = authLifecycleRef.current.signOut();
     chatAbortRef.current?.abort();
     chatAbortRef.current = null;
     setBusy(false);
@@ -245,7 +238,7 @@ export default function App() {
       }
     }
     // Do not let a slow sign-out response clear a newer sign-in session.
-    if (authGenerationRef.current !== signOutGeneration) return;
+    if (!authLifecycleRef.current.isCurrent(signOutSnapshot)) return;
     setAccessToken("");
     setResult(null);
     setChatMessages([]);
