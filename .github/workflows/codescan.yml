@@ -35,15 +35,15 @@ jobs:
                 with:
                     path: |
                         ~/.sonar
-                    key: ${{ runner.os }}-sonar-8.4.0.16527
+                    key: ${{ runner.os }}-sonar-5.0.2.4997
                     restore-keys: ${{ runner.os }}-sonar-
             -   name: Run Analysis
                 uses: codescan-io/codescan-scanner-action@5b2e8c5683ef6a5adc8fa3b7950bb07debccce12
                 env:
                     # The CodeScan action's bundled sonarqube-scanner package supports
                     # SONAR_SCANNER_VERSION. 4.4.0.2170 runs Java 11 and cannot load
-                    # the current CodeScan server's Java 17 bytecode.
-                    SONAR_SCANNER_VERSION: "8.4.0.16527"
+                    # the current CodeScan server's Java 17 bytecode. CLI 5.0.2 bundles Java 17 and retains the legacy Linux archive naming expected by this wrapper.
+                    SONAR_SCANNER_VERSION: "5.0.2.4997"
                 with:
                     login: ${{ secrets.CODESCAN_AUTH_TOKEN }}
                     organization: ${{ secrets.CODESCAN_ORGANIZATION_KEY }}
