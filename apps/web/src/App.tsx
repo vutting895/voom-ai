@@ -184,29 +184,27 @@ export default function App() {
   }
 
   async function signOut() {
-    if (!supabase) {
-      setAccessToken("");
-      setResult(null);
-      setChatMessages([]);
-      setChatInput("");
-      setView("overview");
-      return;
-    }
-    try {
-      const { error: signOutError } = await supabase.auth.signOut();
-      if (signOutError) {
-        setError(language === "th" ? "ออกจากระบบไม่สำเร็จ" : "Sign-out failed");
-        return;
+    let remoteSignOutFailed = false;
+    if (supabase) {
+      try {
+        const { error: signOutError } = await supabase.auth.signOut();
+        remoteSignOutFailed = Boolean(signOutError);
+      } catch {
+        remoteSignOutFailed = true;
       }
-      setAccessToken("");
-      setResult(null);
-      setChatMessages([]);
-      setChatInput("");
-      setView("overview");
-      setError("");
-    } catch {
-      setError(language === "th" ? "ไม่สามารถติดต่อ Supabase เพื่อออกจากระบบได้" : "Could not reach Supabase to sign out");
+      if (remoteSignOutFailed) {
+        // Clear this device's persisted session even when the remote revoke is unavailable.
+        try { await supabase.auth.signOut({ scope: "local" }); } catch { /* local UI state is cleared below */ }
+      }
     }
+    setAccessToken("");
+    setResult(null);
+    setChatMessages([]);
+    setChatInput("");
+    setView("overview");
+    setError(remoteSignOutFailed
+      ? (language === "th" ? "ล้าง Session ในอุปกรณ์แล้ว แต่ยืนยันการออกจากระบบกับ Supabase ไม่ได้" : "Local session cleared; remote sign-out could not be confirmed")
+      : "");
   }
 
   function content() {
