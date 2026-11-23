@@ -73,6 +73,9 @@ private fun VoomApp() {
     var error by remember { mutableStateOf("") }
     var supabaseStatus by remember { mutableStateOf("Not verified") }
     var supabaseChecking by remember { mutableStateOf(false) }
+    var coreSnapshot by remember { mutableStateOf<NovaCoreSnapshot?>(null) }
+    var coreChecking by remember { mutableStateOf(false) }
+    var coreError by remember { mutableStateOf("") }
 
     val thai = language == "TH"
     val title = when (screen) {
@@ -118,6 +121,9 @@ private fun VoomApp() {
         chatInput = ""
         chatMessages = emptyList()
         chatBusy = false
+        coreSnapshot = null
+        coreChecking = false
+        coreError = ""
         authBusy = false
         error = ""
         screen = Screen.OVERVIEW
@@ -134,6 +140,24 @@ private fun VoomApp() {
                 } else {
                     "Local session cleared; Supabase sign-out could not be confirmed"
                 }
+            }
+        }
+    }
+
+    fun refreshCoreStatus() {
+        val token = accessToken
+        if (token.isBlank()) {
+            coreError = if (thai) "กรุณาเข้าสู่ระบบก่อนตรวจสอบ NOVA Core" else "Sign in before checking NOVA Core"
+            return
+        }
+        coreChecking = true
+        coreError = ""
+        NovaApi.fetchCoreSnapshot(token) { snapshot, failure ->
+            // Do not let a late response repopulate another user's connection state.
+            if (authSession?.accessToken == token) {
+                coreSnapshot = snapshot
+                coreError = failure.orEmpty()
+                coreChecking = false
             }
         }
     }
@@ -280,7 +304,36 @@ private fun VoomApp() {
                             ChatPanel(chatMessages, chatInput, { chatInput = it }, chatBusy, error, thai, { sendMessage() })
                         }
                         Screen.BRIDGE -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            StatusCard("NOVA CORE", if (thai) "ระบบวิเคราะห์หลัก" else "Analysis engine", thai)
+                            StatusCard("NOVA CORE", if (thai) "System Integration Hub" else "System Integration Hub", thai)
+                            Text(
+                                coreSnapshot?.let { if (thai) "ยืนยัน API แล้ว · ${it.integrations.size} integrations" else "API authenticated · ${it.integrations.size} integrations" }
+                                    ?: if (thai) "ยังไม่ยืนยันการเชื่อมต่อ NOVA Core" else "NOVA Core is not verified",
+                                color = if (coreSnapshot != null) Cyan else Amber,
+                                fontSize = 12.sp
+                            )
+                            Button(
+                                enabled = !coreChecking && accessToken.isNotBlank(),
+                                onClick = { refreshCoreStatus() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (coreChecking) {
+                                    if (thai) "กำลังตรวจสอบ..." else "Checking..."
+                                } else {
+                                    if (thai) "ตรวจสอบ NOVA Core" else "Check NOVA Core"
+                                })
+                            }
+                            if (coreError.isNotBlank()) Text(coreError, color = Amber, fontSize = 11.sp)
+                            coreSnapshot?.let { snapshot ->
+                                Text(if (thai) "Integrations" else "Integrations", color = Muted, fontSize = 10.sp)
+                                snapshot.integrations.forEach { Text(it, color = TextMain, fontSize = 11.sp) }
+                                Text(if (thai) "Connections ของบัญชีนี้" else "Connections owned by this account", color = Muted, fontSize = 10.sp)
+                                if (snapshot.connections.isEmpty()) {
+                                    Text(if (thai) "ยังไม่มี Connection" else "No connections registered", color = Muted, fontSize = 11.sp)
+                                } else {
+                                    snapshot.connections.forEach { Text(it, color = TextMain, fontSize = 11.sp) }
+                                }
+                                Text(if (thai) "ข้อมูลบัญชี/ตลาดยังไม่ถือว่ายืนยันจนกว่าจะมี data_verified จาก Proxy" else "Account/market data remains unverified until the Proxy confirms it.", color = Amber, fontSize = 10.sp)
+                            }
                             StatusCard("MT5 BRIDGE", if (thai) "การเชื่อมต่อ MetaTrader 5" else "MetaTrader 5 connection", thai)
                             Text("Supabase Auth health check", color = Muted, fontSize = 11.sp)
                             Text(supabaseStatus, color = if (supabaseStatus.startsWith("Connected")) Cyan else Amber, fontSize = 12.sp)
@@ -303,7 +356,7 @@ private fun VoomApp() {
                                     color = Blue
                                 )
                             }
-                            Text(if (thai) "สถานะ NOVA และ MT5 จะแสดงเมื่อได้รับข้อมูลยืนยันจาก API/Heartbeat จริงเท่านั้น" else "NOVA and MT5 status require verified API/heartbeat responses.", color = Muted, fontSize = 11.sp)
+                            Text(if (thai) "คำขอใช้ GET แบบ authenticated read-only เท่านั้น ไม่มีการสร้าง Connection หรือส่งคำสั่งซื้อขาย" else "Only authenticated read-only GET requests are made. No connection is created and no trade is submitted.", color = Muted, fontSize = 11.sp)
                         }
                     }
                     Text(if (thai) "READ-ONLY · PAPER SIMULATION เท่านั้น" else "READ-ONLY · PAPER SIMULATION ONLY", color = Cyan, fontSize = 9.sp, letterSpacing = .8.sp)
