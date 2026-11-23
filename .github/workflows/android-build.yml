@@ -9,7 +9,9 @@ on:
       - "apps/web/**"
       - "netlify/**"
       - "netlify.toml"
-      - "package.json"`r`n      - "package-lock.json"`r`n      - ".github/dependabot.yml"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/dependabot.yml"
       - ".github/workflows/android-build.yml"
   workflow_dispatch:
 
