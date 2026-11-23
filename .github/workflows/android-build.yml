@@ -86,6 +86,9 @@ jobs:
           gradle --version
           sdkmanager --list_installed
 
+      - name: Run Android unit tests
+        run: gradle --no-daemon -p apps/android testDebugUnitTest
+
       - name: Build debug APK
         run: gradle --no-daemon -p apps/android assembleDebug
 
