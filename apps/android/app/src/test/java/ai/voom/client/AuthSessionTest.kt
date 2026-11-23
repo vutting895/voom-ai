@@ -7,6 +7,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AuthSessionTest {
+    @Test fun newerAuthOperationInvalidatesOlderCallback() {
+        val gate = AuthOperationGate()
+        val first = gate.begin()
+        val second = gate.begin()
+        assertFalse(gate.isCurrent(first))
+        assertTrue(gate.isCurrent(second))
+    }
+
+    @Test fun signOutOperationInvalidatesPendingRefreshCallback() {
+        val gate = AuthOperationGate()
+        val pendingRefresh = gate.begin()
+        gate.begin() // sign-out starts a newer auth operation
+        assertFalse(gate.isCurrent(pendingRefresh))
+    }
+
     @Test fun sessionOutsideSafetyWindowDoesNotRefresh() {
         assertFalse(AuthSession("a", "r", 1_000L).shouldRefresh(900L))
     }
