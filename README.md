@@ -6,11 +6,11 @@ Client platform for Android and responsive web, integrated with NOVA Core throug
 
 - Android client
 - Responsive web client
-- Thai / English interface
-- Navy + Electric Blue visual direction
+- Thai / English UI
+- Navy + Electric Blue design system
 - Supabase Auth using user access tokens
 - NOVA Analysis API v1 integration
-- Read-only analysis and clearly labeled Paper Simulation
+- Read-only analysis and clearly labelled Paper Simulation
 
 ## Safety boundaries
 
@@ -31,12 +31,13 @@ Client platform for Android and responsive web, integrated with NOVA Core throug
 
 - Zero-cost strict: no paid services or billing activation without explicit approval.
 - GitHub Actions CI is permitted for pull-request verification and explicitly requested manual runs.
-- Android CI is scoped to Android/workflow changes, uses hosted Ubuntu runners, and has bounded job time and artifact retention.
+- Android CI uses hosted Ubuntu runners, a 20-minute job timeout, and 3-day artifact retention.
+- Automatic PR runs are limited to PR opened/reopened events; use manual `workflow_dispatch` for subsequent validation to avoid rerunning on every PR commit update.
 - CI is verification-only: no deployment, signing, publishing, production release, or broker operations.
 - GitHub Actions usage on this private repository may consume included minutes/storage and could incur charges if account allowances are exceeded. Monitor usage; do not increase runner size, retention, or workflow frequency without approval.
 - Local verification remains preferred when practical; CI supplements it where the local environment lacks Android tooling.
 - No Base44 runtime.
-- Build, signing, installation, deployment, and production release require separate approval.
+- Build, signing, installation, deployment, merge, and production release remain separate gates requiring explicit approval.
 
 ## Repository status
 
@@ -46,7 +47,7 @@ Application source code is developed on feature branches and reviewed through pu
 
 Workflow: `.github/workflows/android-build.yml`
 
-- Pull requests targeting `main` that modify `apps/android/**` or the workflow itself.
-- Manual `workflow_dispatch` runs.
+- Pull requests targeting `main` on open/reopen when Android source files are included.
+- Manual `workflow_dispatch` runs for subsequent checks.
 - Builds a debug APK only; no signing or release APK.
 - Uploads the debug APK as a short-lived artifact when the build succeeds.
