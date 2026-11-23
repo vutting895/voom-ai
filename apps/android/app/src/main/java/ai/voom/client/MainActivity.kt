@@ -103,23 +103,19 @@ private fun VoomApp() {
 
     fun signOut() {
         val token = accessToken
-        if (token.isBlank()) {
-            accessToken = ""
-            password = ""
-            chatInput = ""
-            chatMessages = emptyList()
-            error = ""
-            screen = Screen.OVERVIEW
-            return
-        }
+        accessToken = ""
+        password = ""
+        chatInput = ""
+        chatMessages = emptyList()
+        chatBusy = false
+        error = ""
+        screen = Screen.OVERVIEW
+        if (token.isBlank()) return
+
+        // Invalidate local UI state immediately; the remote revoke is best-effort.
         authBusy = true
         NovaApi.signOut(token) { failure ->
             authBusy = false
-            accessToken = ""
-            password = ""
-            chatInput = ""
-            chatMessages = emptyList()
-            screen = Screen.OVERVIEW
             error = if (failure == null) "" else if (thai) {
                 "ล้าง Session ในแอปแล้ว แต่ยืนยันการออกจากระบบกับ Supabase ไม่ได้"
             } else {
@@ -144,16 +140,20 @@ private fun VoomApp() {
             error = if (thai) "ประวัติการสนทนามีขนาดใหญ่เกินไป" else "Conversation is too large"
             return
         }
+        val requestToken = accessToken
         chatBusy = true
         error = ""
-        NovaApi.sendChat(accessToken, requestMessages) { reply, failure ->
-            chatBusy = false
-            if (reply != null) {
-                chatMessages = (requestMessages + NovaChatMessage("assistant", reply.message)).takeLast(8)
-                chatInput = ""
-                error = ""
-            } else {
-                error = failure ?: if (thai) "NOVA AI ไม่พร้อมใช้งาน" else "NOVA AI is unavailable"
+        NovaApi.sendChat(requestToken, requestMessages) { reply, failure ->
+            // Ignore responses from a session that has already signed out or changed.
+            if (accessToken == requestToken) {
+                chatBusy = false
+                if (reply != null) {
+                    chatMessages = (requestMessages + NovaChatMessage("assistant", reply.message)).takeLast(8)
+                    chatInput = ""
+                    error = ""
+                } else {
+                    error = failure ?: if (thai) "NOVA AI ไม่พร้อมใช้งาน" else "NOVA AI is unavailable"
+                }
             }
         }
     }
