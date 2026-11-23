@@ -107,7 +107,7 @@ export default function App() {
         setError(language === "th" ? "ไม่สามารถเชื่อมต่อ Supabase Auth ได้" : "Unable to connect to Supabase Auth");
       }
     });
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
       const nextUserId = session?.user.id ?? null;
       if (authLifecycleRef.current.setUserId(nextUserId)) {
         // Account changes invalidate all in-flight chat work and user-scoped UI state.
@@ -119,6 +119,9 @@ export default function App() {
         setChatInput("");
         setError("");
       }
+      // A successful sign-out event must reset navigation as well as auth state.
+      // Otherwise the next sign-in can reopen the previous user's last view.
+      if (event === "SIGNED_OUT") setView("overview");
       setAccessToken(session?.access_token ?? "");
     });
     return () => {
