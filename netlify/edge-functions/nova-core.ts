@@ -46,7 +46,7 @@ export default async function handler(request: Request): Promise<Response> {
   if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
 
   const authorization = request.headers.get("Authorization") ?? "";
-  if (!/^Bearer\\s+\\S+$/i.test(authorization)) {
+  if (!/^Bearer\s+\S+$/i.test(authorization)) {
     return json({ error: "authentication_required" }, 401);
   }
 
@@ -64,8 +64,8 @@ export default async function handler(request: Request): Promise<Response> {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const contentType = upstream.headers.get("Content-Type") ?? "";
-    if (upstream.status >= 300 && upstream.status < 400 ||
-        !/^application\\/json(?:\\s*;|$)/i.test(contentType)) {
+    if ((upstream.status >= 300 && upstream.status < 400) ||
+        !/^application\/json(?:\s*;|$)/i.test(contentType)) {
       await upstream.body?.cancel();
       return json({ error: "invalid_hub_response" }, 502);
     }
