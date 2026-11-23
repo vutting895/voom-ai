@@ -122,6 +122,7 @@ export default function App() {
         setBusy(false);
         setResult(null);
         setCoreSnapshot(null);
+        setCoreLoading(false);
         setCoreError("");
         setChatMessages([]);
         setChatInput("");
@@ -274,6 +275,7 @@ export default function App() {
     setAccessToken("");
     setResult(null);
     setCoreSnapshot(null);
+    setCoreLoading(false);
     setCoreError("");
     setChatMessages([]);
     setChatInput("");
