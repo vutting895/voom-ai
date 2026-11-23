@@ -65,7 +65,7 @@ private fun VoomApp() {
     var password by remember { mutableStateOf("") }
     var accessToken by remember { mutableStateOf("") }
     var authBusy by remember { mutableStateOf(false) }
-    var authOperationId by remember { mutableStateOf(0) }
+    val authOperations = remember { AuthOperationGate() }
     var chatInput by remember { mutableStateOf("") }
     var chatMessages by remember { mutableStateOf(listOf<NovaChatMessage>()) }
     var chatBusy by remember { mutableStateOf(false) }
@@ -86,13 +86,13 @@ private fun VoomApp() {
             error = if (thai) "กรุณากรอกอีเมลและรหัสผ่าน" else "Enter your email and password"
             return
         }
-        authOperationId += 1
-        val operationId = authOperationId
+        authOperations.begin()
+        val operationId = authOperations.currentId()
         authBusy = true
         error = ""
         NovaApi.signIn(email, password) { token, failure ->
             // Ignore stale authentication callbacks after a newer auth operation.
-            if (authOperationId == operationId) {
+            if (authOperations.isCurrent(operationId)) {
                 authBusy = false
                 if (!token.isNullOrBlank()) {
                     accessToken = token
@@ -119,12 +119,12 @@ private fun VoomApp() {
         if (token.isBlank()) return
 
         // Invalidate local UI state immediately; the remote revoke is best-effort.
-        authOperationId += 1
-        val operationId = authOperationId
+        authOperations.begin()
+        val operationId = authOperations.currentId()
         authBusy = true
         NovaApi.signOut(token) { failure ->
             // A late sign-out response must not overwrite a newer sign-in state.
-            if (authOperationId == operationId) {
+            if (authOperations.isCurrent(operationId)) {
                 authBusy = false
                 error = if (failure == null) "" else if (thai) {
                     "ล้าง Session ในแอปแล้ว แต่ยืนยันการออกจากระบบกับ Supabase ไม่ได้"
