@@ -50,8 +50,9 @@ The worker rejects unknown routes and validates the Supabase bearer token throug
 
 ## Current implementation status
 
-- Web: Supabase email/password session handling and authenticated chat request are implemented in source. Netlify Edge Function and Vite development proxy are added. Updated web build/typecheck and deployed route have not yet been verified.
-- Android: Supabase sign-in, in-memory access-token handling, sign-out, and NOVA AI chat are implemented in source. Updated Android compile/build and APK artifact have not yet been verified.
+- Web source includes Supabase email/password session handling and authenticated chat. Netlify Edge Function and Vite development proxy are implemented. Exact-head CI verification passed on commit `e19a1239aaaf9d290344b50409873ad2c9cd7ce4`: auth lifecycle tests, TypeScript typecheck, and production build all passed in run [45193369983](https://github.com/vutting895/voom-ai/actions/runs/45193369983). A deployed Netlify route and authenticated production request remain unverified.
+- Android source includes Supabase sign-in, in-memory access-token handling, refresh-before-chat, sign-out, and NOVA AI chat. Exact-head CI verification passed in run [45193369983](https://github.com/vutting895/voom-ai/actions/runs/45193369983): unit tests, debug APK build, and artifact upload all passed. Physical-device installation, device QA, and authenticated runtime requests remain unverified.
+- The verified integration boundary is the existing research chat Worker only. A dedicated NOVA Core `/v1/*` API is not connected by this client foundation.
 - Neither client is approved for production use.
 - No real-time market feed or MT5 Bridge data path is implemented in this client foundation.
 
