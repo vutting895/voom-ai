@@ -38,3 +38,11 @@
 - No order submission or broker write operations.
 - No deposits, withdrawals, or transfers.
 - No signing, deployment, publishing, or production release.
+
+## NOVA System Hub (staged)
+
+- Android now calls the fixed `voom-system-hub` HTTPS endpoint using the current Supabase user access token.
+- The current client slice reads only `GET /v1/integrations` and `GET /v1/connections`.
+- The response is accepted only when `ordersEnabled=false` and `liveTradingEnabled=false`; connection readiness is displayed separately from verified account/market data.
+- No connection creation, credential intake, account write, order, execution, deposit, withdrawal, or transfer route is implemented.
+- Runtime success is not claimed until the deployed Hub is confirmed to use the same canonical Supabase project as this client and an authenticated request succeeds on device.
