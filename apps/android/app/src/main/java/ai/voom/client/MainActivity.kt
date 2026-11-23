@@ -48,7 +48,7 @@ private val Muted = Color(0xFF91A4BA)
 private val Amber = Color(0xFFE9B45F)
 private val Border = Color(0xFF20354A)
 
-private enum class Screen { OVERVIEW, MARKET, ANALYSIS, BRIDGE }
+private enum class Screen { OVERVIEW, DASHBOARD, PORTFOLIO, MARKET, ANALYSIS, BRIDGE }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,6 +77,8 @@ private fun VoomApp() {
     val thai = language == "TH"
     val title = when (screen) {
         Screen.OVERVIEW -> if (thai) "ภาพรวมระบบ" else "System overview"
+        Screen.DASHBOARD -> if (thai) "แดชบอร์ด" else "Dashboard"
+        Screen.PORTFOLIO -> if (thai) "พอร์ตการลงทุน" else "Portfolio"
         Screen.MARKET -> if (thai) "ตลาด" else "Markets"
         Screen.ANALYSIS -> if (thai) "NOVA AI Chat" else "NOVA AI Chat"
         Screen.BRIDGE -> if (thai) "การเชื่อมต่อ" else "Connections"
@@ -265,6 +267,8 @@ private fun VoomApp() {
                                 }
                             }
                         }
+                        Screen.DASHBOARD -> DashboardPanel(thai)
+                        Screen.PORTFOLIO -> PortfolioPanel(thai)
                         Screen.MARKET -> EmptyPanel(
                             if (thai) "ตลาดที่ติดตาม" else "Watchlist",
                             if (thai) "ยังไม่มี Market Feed" else "No market feed connected",
@@ -308,10 +312,12 @@ private fun VoomApp() {
                     modifier = Modifier.fillMaxWidth().background(Panel).border(width = 1.dp, color = Border).padding(horizontal = 6.dp, vertical = 7.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    NavItem(if (thai) "ภาพรวม" else "Overview", "◫", screen == Screen.OVERVIEW) { screen = Screen.OVERVIEW; error = "" }
+                    NavItem(if (thai) "Home" else "Home", "⌂", screen == Screen.OVERVIEW) { screen = Screen.OVERVIEW; error = "" }
+                    NavItem(if (thai) "Dashboard" else "Dashboard", "▦", screen == Screen.DASHBOARD) { screen = Screen.DASHBOARD; error = "" }
+                    NavItem(if (thai) "Portfolio" else "Portfolio", "◫", screen == Screen.PORTFOLIO) { screen = Screen.PORTFOLIO; error = "" }
                     NavItem(if (thai) "ตลาด" else "Markets", "⌁", screen == Screen.MARKET) { screen = Screen.MARKET; error = "" }
-                    NavItem(if (thai) "NOVA AI" else "NOVA AI", "⌗", screen == Screen.ANALYSIS) { screen = Screen.ANALYSIS; error = "" }
-                    NavItem(if (thai) "เชื่อมต่อ" else "Bridge", "⇄", screen == Screen.BRIDGE) { screen = Screen.BRIDGE; error = "" }
+                    NavItem("AI", "⌗", screen == Screen.ANALYSIS) { screen = Screen.ANALYSIS; error = "" }
+                    NavItem(if (thai) "Bridge" else "Bridge", "⇄", screen == Screen.BRIDGE) { screen = Screen.BRIDGE; error = "" }
                 }
             }
         }
@@ -388,6 +394,71 @@ private fun ChatPanel(
             Text(if (busy) (if (thai) "กำลังตอบ..." else "Thinking...") else (if (thai) "ส่งข้อความ" else "Send message"))
         }
         Text(if (thai) "ข้อมูลเพื่อการวิจัยเท่านั้น ไม่มีคำสั่งซื้อขาย และ Live Trading ปิดอยู่" else "Research only. No order capability. Live Trading remains OFF.", color = Muted, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun DashboardPanel(thai: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(color = Panel, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Border, RoundedCornerShape(16.dp))) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("ACCOUNT OVERVIEW", color = Blue, fontSize = 9.sp, letterSpacing = 1.3.sp)
+                Text(if (thai) "ภาพรวมบัญชีเทรด" else "Trading account overview", color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (thai) "รอเชื่อมต่อ NOVA Core / MT5 Bridge" else "Awaiting NOVA Core / MT5 Bridge connection", color = Amber, fontSize = 10.sp)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            MetricTile(if (thai) "Balance" else "Balance", "—", if (thai) "ยอดเงินคงเหลือ" else "Account balance", Modifier.weight(1f))
+            MetricTile("Equity", "—", if (thai) "มูลค่าทุนสุทธิ" else "Net equity", Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            MetricTile("Floating P/L", "—", if (thai) "กำไร/ขาดทุนลอยตัว" else "Unrealized P/L", Modifier.weight(1f))
+            MetricTile(if (thai) "Positions" else "Positions", "—", if (thai) "สถานะที่เปิดอยู่" else "Open positions", Modifier.weight(1f))
+        }
+        EmptyPanel(
+            if (thai) "สถานะการเชื่อมต่อ" else "Connection status",
+            if (thai) "ยังไม่มีข้อมูลบัญชีจาก API ที่ยืนยันตัวตนและตรวจสอบ ownership แล้ว" else "No account data from an authenticated, owner-scoped API has been verified.",
+            if (thai) "ตัวเลขจะแสดงเมื่อ API ยืนยันผู้ใช้และบัญชี MT5 ที่เป็นเจ้าของเท่านั้น" else "Metrics will appear only after user and MT5 account ownership are verified."
+        )
+        Text(if (thai) "ข้อมูลบัญชีไม่ถูกจำลอง และไม่มีการส่งคำสั่งซื้อขายจากหน้านี้" else "Account values are not simulated. This page cannot submit trades.", color = Muted, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun PortfolioPanel(thai: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(color = Panel, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Border, RoundedCornerShape(16.dp))) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("PORTFOLIO", color = Blue, fontSize = 9.sp, letterSpacing = 1.3.sp)
+                Text(if (thai) "สินทรัพย์และสถานะการถือครอง" else "Assets and open positions", color = TextMain, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (thai) "ข้อมูลจริงจะแสดงเมื่อเชื่อมต่อ API สำเร็จ" else "Live values appear after a verified API connection", color = Muted, fontSize = 10.sp)
+            }
+        }
+        Surface(color = Panel, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().border(1.dp, Border, RoundedCornerShape(14.dp))) {
+            Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(if (thai) "สินทรัพย์" else "ASSET", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text(if (thai) "ฝั่ง / ขนาด" else "SIDE / SIZE", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("P/L", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(1.dp).background(Border))
+                Text(if (thai) "ยังไม่มีข้อมูล Portfolio" else "No portfolio data available", color = TextMain, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text(if (thai) "ไม่มีการสร้างรายการสินทรัพย์หรือสถานะจำลอง" else "No synthetic assets or positions are generated.", color = Muted, fontSize = 10.sp)
+            }
+        }
+        MetricTile(if (thai) "มูลค่าพอร์ตรวม" else "Total portfolio value", "—", if (thai) "รอข้อมูลจากบัญชีที่ยืนยันแล้ว" else "Awaiting verified account data", Modifier.fillMaxWidth())
+        MetricTile(if (thai) "กำไร/ขาดทุนรวม" else "Total P/L", "—", if (thai) "รอข้อมูลจาก API" else "Awaiting API data", Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun MetricTile(label: String, value: String, hint: String, modifier: Modifier = Modifier) {
+    Surface(color = Panel, shape = RoundedCornerShape(13.dp), modifier = modifier.border(1.dp, Border, RoundedCornerShape(13.dp))) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(label, color = Muted, fontSize = 9.sp, letterSpacing = .5.sp)
+            Text(value, color = TextMain, fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
+            Text(hint, color = Muted, fontSize = 9.sp, lineHeight = 13.sp)
+        }
     }
 }
 
