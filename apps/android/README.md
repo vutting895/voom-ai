@@ -1,12 +1,14 @@
 # Android Client Status
 
-**Current state: UI foundation only.** Supabase Auth and NOVA Analysis API calls are not implemented. The disabled action in `MainActivity` is intentional.
+**Current state: UI foundation only.** The Android client does not yet implement Supabase user authentication or NOVA Analysis API requests. The Analysis screen is informational only; no trading capability is present.
 
 ## Configuration
 
-The generated `BuildConfig` values for the NOVA API base URL, Supabase URL, and public Supabase key default to empty strings. Do not add service-role keys, database credentials, broker credentials, or other secrets to Gradle files, source code, or the APK.
+- `NOVA_ANALYSIS_API_BASE_URL` is currently blank and must be configured before analysis can be enabled.
+- `SUPABASE_URL` and the Supabase publishable client key are currently supplied as public client configuration in Gradle. Publishable keys are not service-role secrets.
+- Never add Supabase service-role keys, database credentials, broker credentials, tenant secrets, or other privileged values to Gradle files, source code, or the APK.
 
-Do not enable analysis until all of the following are implemented and reviewed:
+## Required before enabling analysis
 
 1. Supabase user authentication with secure session handling and sign-out.
 2. HTTPS requests to `POST /v1/analysis/candles` using the current user's access token.
@@ -16,4 +18,11 @@ Do not enable analysis until all of the following are implemented and reviewed:
 
 ## Build status
 
-No Gradle Wrapper is committed yet. A reproducible Android build has not been verified. Use Android Studio with a compatible JDK/Android SDK for local verification; do not sign, install, or distribute an APK without separate approval.
+No Gradle Wrapper is committed yet. The GitHub Actions workflow installs a pinned Gradle version for a debug-only build. A successful reproducible Android build and APK artifact are not currently confirmed. Do not sign, install, distribute, or release an APK without separate approval.
+
+## Safety
+
+- Live Trading remains OFF.
+- No order submission or broker write operations.
+- No deposits, withdrawals, or transfers.
+- No signing, deployment, publishing, or production release.
