@@ -3,13 +3,13 @@ name: Client Build Verification
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-    branches: [main]
+    branches: [main, feature/voom-ai-client-foundation]
     paths:
       - "apps/android/**"
       - "apps/web/**"
       - "netlify/**"
       - "netlify.toml"
-      - "package.json"
+      - "package.json"`r`n      - "package-lock.json"`r`n      - ".github/dependabot.yml"
       - ".github/workflows/android-build.yml"
   workflow_dispatch:
 
