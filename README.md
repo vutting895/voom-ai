@@ -42,3 +42,11 @@ Client platform for Android and responsive web, integrated with the authenticate
 ## Repository status
 
 Application source code is developed on feature branches and reviewed through pull requests. Main is the source of truth. Do not merge until required verification and manual review gates pass.
+
+## NOVA Core read-only integration
+
+- Web reads the authenticated NOVA System Integration Hub registry and the signed-in user's own connection list through a fixed Netlify Edge proxy at `/api/core/*`.
+- Android calls the fixed Hub HTTPS origin directly with the current Supabase user access token.
+- Only `GET /v1/integrations` and `GET /v1/connections` are exposed in this client slice. No connection creation, credential intake, account mutation, market-data write, or trading endpoint is available.
+- The clients reject responses unless `ordersEnabled=false` and `liveTradingEnabled=false`; connection records remain unverified unless the Hub reports `dataVerified=true`.
+- Runtime integration remains gated on confirming the deployed Hub uses the canonical VOOM/NOVA Supabase project and testing a real authenticated account. A source-level client implementation is not proof of production connectivity.
