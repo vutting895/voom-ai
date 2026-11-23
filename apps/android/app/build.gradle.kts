@@ -14,11 +14,19 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        // Empty defaults fail closed. Supply public configuration only after
-        // Android Auth/API integration is implemented and reviewed.
-        buildConfigField("String", "NOVA_ANALYSIS_API_BASE_URL", "\"\"")
-        buildConfigField("String", "SUPABASE_URL", "\"\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"\"")
+        // Supabase publishable key is public client configuration, never a service-role secret.
+        buildConfigField("String", "NOVA_ANALYSIS_API_BASE_URL", "\"\")"
+        buildConfigField("String", "SUPABASE_URL", "\"https://rovhmjeowracayicbqij.supabase.co\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"sb_publishable_8v2gtmbRHCoKKnE3P2ZgaQ_Vr3tZYza\"")
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
     }
 
     buildFeatures { compose = true; buildConfig = true }
