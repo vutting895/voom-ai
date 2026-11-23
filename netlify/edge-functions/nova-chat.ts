@@ -97,9 +97,11 @@ export default async function handler(request: Request): Promise<Response> {
       : json({ error: "invalid_request_body" }, 400);
   }
 
+  let bodyText: string;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bodyBytes));
+    bodyText = new TextDecoder("utf-8", { fatal: true }).decode(bodyBytes);
+    parsed = JSON.parse(bodyText);
   } catch {
     return json({ error: "invalid_json" }, 400);
   }
@@ -115,7 +117,7 @@ export default async function handler(request: Request): Promise<Response> {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: bodyBytes,
+      body: bodyText,
       redirect: "manual",
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
@@ -139,7 +141,14 @@ export default async function handler(request: Request): Promise<Response> {
       return json({ error: "upstream_response_too_large" }, 502);
     }
 
-    return new Response(responseBytes, {
+    let responseText: string;
+    try {
+      responseText = new TextDecoder("utf-8", { fatal: true }).decode(responseBytes);
+    } catch {
+      return json({ error: "invalid_upstream_encoding" }, 502);
+    }
+
+    return new Response(responseText, {
       status: upstream.status,
       headers: {
         "Content-Type": "application/json; charset=utf-8",
