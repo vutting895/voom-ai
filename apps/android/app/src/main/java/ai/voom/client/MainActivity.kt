@@ -75,6 +75,7 @@ private fun VoomApp() {
     var supabaseChecking by remember { mutableStateOf(false) }
     var coreSnapshot by remember { mutableStateOf<NovaCoreSnapshot?>(null) }
     var coreChecking by remember { mutableStateOf(false) }
+    var coreRequestId by remember { mutableStateOf(0) }
     var coreError by remember { mutableStateOf("") }
 
     val thai = language == "TH"
@@ -123,6 +124,7 @@ private fun VoomApp() {
         chatBusy = false
         coreSnapshot = null
         coreChecking = false
+        coreRequestId += 1
         coreError = ""
         authBusy = false
         error = ""
@@ -150,11 +152,13 @@ private fun VoomApp() {
             coreError = if (thai) "กรุณาเข้าสู่ระบบก่อนตรวจสอบ NOVA Core" else "Sign in before checking NOVA Core"
             return
         }
+        val requestId = coreRequestId + 1
+        coreRequestId = requestId
         coreChecking = true
         coreError = ""
         NovaApi.fetchCoreSnapshot(token) { snapshot, failure ->
-            // Do not let a late response repopulate another user's connection state.
-            if (authSession?.accessToken == token) {
+            // Ignore responses invalidated by sign-out or a newer refresh request.
+            if (coreRequestId == requestId && authSession != null) {
                 coreSnapshot = snapshot
                 coreError = failure.orEmpty()
                 coreChecking = false
