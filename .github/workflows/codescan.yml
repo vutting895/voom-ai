@@ -42,6 +42,25 @@ jobs:
                         ~/.sonar
                     key: ${{ runner.os }}-sonar-5.0.2.4997
                     restore-keys: ${{ runner.os }}-sonar-
+            -   name: Validate CodeScan secret presence
+                shell: bash
+                env:
+                    CODESCAN_AUTH_TOKEN: ${{ secrets.CODESCAN_AUTH_TOKEN }}
+                    CODESCAN_ORGANIZATION_KEY: ${{ secrets.CODESCAN_ORGANIZATION_KEY }}
+                    CODESCAN_PROJECT_KEY: ${{ secrets.CODESCAN_PROJECT_KEY }}
+                run: |
+                    missing=0
+                    for name in CODESCAN_AUTH_TOKEN CODESCAN_ORGANIZATION_KEY CODESCAN_PROJECT_KEY; do
+                      if [[ -z "${!name}" ]]; then
+                        echo "::error::Required GitHub Actions secret is missing or unavailable in this workflow context: ${name}"
+                        missing=1
+                      else
+                        echo "Secret presence check passed: ${name}"
+                      fi
+                    done
+                    if [[ "$missing" -ne 0 ]]; then
+                      exit 1
+                    fi
             -   name: Run Analysis
                 uses: codescan-io/codescan-scanner-action@5b2e8c5683ef6a5adc8fa3b7950bb07debccce12
                 env:
