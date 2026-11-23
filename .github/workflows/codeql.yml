@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/voom-ai-client-foundation
+      - ci/codeql-on-client-source
   pull_request:
     branches:
       - main
