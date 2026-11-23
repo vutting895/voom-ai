@@ -43,6 +43,21 @@ test("fetches only authenticated registry and owner-scoped connection routes", a
   assert.equal(result.connections[0].dataVerified, false);
 });
 
+test("accepts an authenticated empty connection list as an empty state, not an API failure", async () => {
+  const result = await fetchCoreSnapshot("user-token", async url => new Response(
+    JSON.stringify(url.endsWith("/integrations") ? registry : {
+      connections: [],
+      count: 0,
+      ordersEnabled: false,
+      liveTradingEnabled: false,
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  ));
+  assert.equal(result.integrations.length, 1);
+  assert.equal(result.connections.length, 0);
+  assert.equal(result.mode, "read-only");
+});
+
 test("rejects missing access token", async () => {
   await assert.rejects(() => fetchCoreSnapshot(""), /Sign in/);
 });
