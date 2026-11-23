@@ -75,16 +75,16 @@ export default async function handler(request: Request): Promise<Response> {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   const authorization = request.headers.get("Authorization") ?? "";
-  if (!/^Bearer\\s+\\S+$/i.test(authorization)) {
+  if (!/^Bearer\s+\S+$/i.test(authorization)) {
     return json({ error: "authentication_required" }, 401);
   }
 
-  if (!/^application\\/json(?:\\s*;|$)/i.test(request.headers.get("Content-Type") ?? "")) {
+  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("Content-Type") ?? "")) {
     return json({ error: "content_type_must_be_application_json" }, 415);
   }
 
   const contentLength = request.headers.get("Content-Length");
-  if (contentLength && /^\\d+$/.test(contentLength) && Number(contentLength) > MAX_REQUEST_BYTES) {
+  if (contentLength && /^\d+$/.test(contentLength) && Number(contentLength) > MAX_REQUEST_BYTES) {
     return json({ error: "request_too_large" }, 413);
   }
 
@@ -121,12 +121,13 @@ export default async function handler(request: Request): Promise<Response> {
     });
 
     const responseType = upstream.headers.get("Content-Type") ?? "";
-    if (!/^application\\/json(?:\\s*;|$)/i.test(responseType)) {
+    if (!/^application\/json(?:\s*;|$)/i.test(responseType)) {
+      await upstream.body?.cancel();
       return json({ error: "invalid_upstream_content_type" }, 502);
     }
 
     const responseLength = upstream.headers.get("Content-Length");
-    if (responseLength && /^\\d+$/.test(responseLength) && Number(responseLength) > MAX_RESPONSE_BYTES) {
+    if (responseLength && /^\d+$/.test(responseLength) && Number(responseLength) > MAX_RESPONSE_BYTES) {
       await upstream.body?.cancel();
       return json({ error: "upstream_response_too_large" }, 502);
     }
