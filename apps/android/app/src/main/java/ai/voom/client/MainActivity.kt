@@ -152,12 +152,13 @@ private fun VoomApp() {
             return
         }
 
+        val operationId = authOperations.begin()
         chatBusy = true
         error = ""
         fun submitWith(session: AuthSession) {
-            if (authSession != session) return
+            if (!authOperations.isCurrent(operationId) || authSession != session) return
             NovaApi.sendChat(session.accessToken, requestMessages) { reply, failure ->
-                if (authSession == session) {
+                if (authOperations.isCurrent(operationId) && authSession == session) {
                     chatBusy = false
                     if (reply != null) {
                         chatMessages = (requestMessages + NovaChatMessage("assistant", reply.message)).takeLast(8)
@@ -172,7 +173,7 @@ private fun VoomApp() {
 
         if (currentSession.shouldRefresh(System.currentTimeMillis() / 1000L)) {
             NovaApi.refreshSession(currentSession) { refreshed, failure ->
-                if (authSession == currentSession) {
+                if (authOperations.isCurrent(operationId) && authSession == currentSession) {
                     if (refreshed != null) {
                         // Replace the whole session because Supabase can rotate refresh_token.
                         authSession = refreshed
