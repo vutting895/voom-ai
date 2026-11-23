@@ -54,6 +54,17 @@ test("fails closed when the Hub omits or enables a trading safety flag", async (
   )), /safety flags/);
 });
 
+test("rejects a connection record that does not confirm read-only flags", async () => {
+  await assert.rejects(() => fetchCoreSnapshot("user-token", async url => new Response(
+    JSON.stringify(url.endsWith("/integrations") ? registry : {
+      connections: [{ ...connections.connections[0], ordersEnabled: true }],
+      ordersEnabled: false,
+      liveTradingEnabled: false,
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  )), /connection did not confirm read-only/);
+});
+
 test("rejects malformed response and never treats non-verified data as connected", async () => {
   await assert.rejects(() => fetchCoreSnapshot("user-token", async url => new Response(
     JSON.stringify(url.endsWith("/integrations") ? registry : { connections: "not-an-array", ordersEnabled: false, liveTradingEnabled: false }),
