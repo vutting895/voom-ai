@@ -1,52 +1,45 @@
 package ai.voom.client
 
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AuthSessionTest {
-    @Test
-    fun sessionDoesNotRefreshWhenExpiryIsOutsideSafetyWindow() {
-        val session = AuthSession(
-            accessToken = "access",
-            refreshToken = "refresh",
-            expiresAtEpochSeconds = 1_000L
-        )
-
-        assertFalse(session.shouldRefresh(nowEpochSeconds = 900L))
+    @Test fun sessionOutsideSafetyWindowDoesNotRefresh() {
+        assertFalse(AuthSession("a", "r", 1_000L).shouldRefresh(900L))
     }
 
-    @Test
-    fun sessionRefreshesInsideDefaultSixtySecondSafetyWindow() {
-        val session = AuthSession(
-            accessToken = "access",
-            refreshToken = "refresh",
-            expiresAtEpochSeconds = 1_000L
-        )
-
-        assertTrue(session.shouldRefresh(nowEpochSeconds = 940L))
+    @Test fun sessionInsideSafetyWindowRefreshes() {
+        assertTrue(AuthSession("a", "r", 1_000L).shouldRefresh(940L))
     }
 
-    @Test
-    fun sessionRefreshesWhenAlreadyExpired() {
-        val session = AuthSession(
-            accessToken = "access",
-            refreshToken = "refresh",
-            expiresAtEpochSeconds = 1_000L
-        )
-
-        assertTrue(session.shouldRefresh(nowEpochSeconds = 1_001L))
+    @Test fun expiredSessionRefreshes() {
+        assertTrue(AuthSession("a", "r", 1_000L).shouldRefresh(1_001L))
     }
 
-    @Test
-    fun zeroSkewRefreshesOnlyAtOrAfterExpiry() {
-        val session = AuthSession(
-            accessToken = "access",
-            refreshToken = "refresh",
-            expiresAtEpochSeconds = 1_000L
-        )
+    @Test fun zeroSkewRefreshesAtExpiryBoundary() {
+        val session = AuthSession("a", "r", 1_000L)
+        assertFalse(session.shouldRefresh(999L, 0L))
+        assertTrue(session.shouldRefresh(1_000L, 0L))
+    }
 
-        assertFalse(session.shouldRefresh(nowEpochSeconds = 999L, refreshSkewSeconds = 0L))
-        assertTrue(session.shouldRefresh(nowEpochSeconds = 1_000L, refreshSkewSeconds = 0L))
+    @Test fun parsesSupabaseExpiryAndRotatedRefreshToken() {
+        val session = AuthSession.fromSupabaseResponse(
+            JSONObject("""{"access_token":"new-access","refresh_token":"rotated-refresh","expires_in":3600}"""),
+            10_000L
+        )
+        assertEquals("new-access", session.accessToken)
+        assertEquals("rotated-refresh", session.refreshToken)
+        assertEquals(13_600L, session.expiresAtEpochSeconds)
+    }
+
+    @Test fun absoluteExpiryTakesPrecedence() {
+        val session = AuthSession.fromSupabaseResponse(
+            JSONObject("""{"access_token":"a","refresh_token":"r","expires_in":3600,"expires_at":12345}"""),
+            10_000L
+        )
+        assertEquals(12_345L, session.expiresAtEpochSeconds)
     }
 }
