@@ -65,6 +65,7 @@ private fun VoomApp() {
     var password by remember { mutableStateOf("") }
     var accessToken by remember { mutableStateOf("") }
     var authBusy by remember { mutableStateOf(false) }
+    var authOperationId by remember { mutableStateOf(0) }
     var chatInput by remember { mutableStateOf("") }
     var chatMessages by remember { mutableStateOf(listOf<NovaChatMessage>()) }
     var chatBusy by remember { mutableStateOf(false) }
@@ -85,18 +86,23 @@ private fun VoomApp() {
             error = if (thai) "กรุณากรอกอีเมลและรหัสผ่าน" else "Enter your email and password"
             return
         }
+        authOperationId += 1
+        val operationId = authOperationId
         authBusy = true
         error = ""
         NovaApi.signIn(email, password) { token, failure ->
-            authBusy = false
-            if (!token.isNullOrBlank()) {
-                accessToken = token
-                password = ""
-                error = ""
-                screen = Screen.ANALYSIS
-            } else {
-                password = ""
-                error = failure ?: if (thai) "เข้าสู่ระบบไม่สำเร็จ" else "Sign-in failed"
+            // Ignore stale authentication callbacks after a newer auth operation.
+            if (authOperationId == operationId) {
+                authBusy = false
+                if (!token.isNullOrBlank()) {
+                    accessToken = token
+                    password = ""
+                    error = ""
+                    screen = Screen.ANALYSIS
+                } else {
+                    password = ""
+                    error = failure ?: if (thai) "เข้าสู่ระบบไม่สำเร็จ" else "Sign-in failed"
+                }
             }
         }
     }
@@ -113,13 +119,18 @@ private fun VoomApp() {
         if (token.isBlank()) return
 
         // Invalidate local UI state immediately; the remote revoke is best-effort.
+        authOperationId += 1
+        val operationId = authOperationId
         authBusy = true
         NovaApi.signOut(token) { failure ->
-            authBusy = false
-            error = if (failure == null) "" else if (thai) {
-                "ล้าง Session ในแอปแล้ว แต่ยืนยันการออกจากระบบกับ Supabase ไม่ได้"
-            } else {
-                "Local session cleared; Supabase sign-out could not be confirmed"
+            // A late sign-out response must not overwrite a newer sign-in state.
+            if (authOperationId == operationId) {
+                authBusy = false
+                error = if (failure == null) "" else if (thai) {
+                    "ล้าง Session ในแอปแล้ว แต่ยืนยันการออกจากระบบกับ Supabase ไม่ได้"
+                } else {
+                    "Local session cleared; Supabase sign-out could not be confirmed"
+                }
             }
         }
     }
