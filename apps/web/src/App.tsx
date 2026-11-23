@@ -187,7 +187,7 @@ export default function App() {
       setResult(payload);
       setChatInput("");
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (chatAbortRef.current === controller) {
         setError(cause instanceof DOMException && cause.name === "AbortError"
           ? (language === "th" ? "หมดเวลารอ NOVA AI (15 วินาที)" : "NOVA AI timed out (15 seconds)")
           : cause instanceof Error ? cause.message : t.apiFailed);
