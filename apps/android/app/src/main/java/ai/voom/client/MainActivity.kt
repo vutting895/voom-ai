@@ -111,7 +111,7 @@ private fun VoomApp() {
                         Screen.BRIDGE -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             StatusCard(if (thai) "NOVA CORE" else "NOVA CORE", if (thai) "ระบบวิเคราะห์หลัก" else "Analysis engine", thai)
                             StatusCard("MT5 BRIDGE", if (thai) "การเชื่อมต่อ MetaTrader 5" else "MetaTrader 5 connection", thai)
-                            Text("Supabase Auth API", color = Muted, fontSize = 11.sp)
+                            Text("Supabase Auth health check", color = Muted, fontSize = 11.sp)
                             Text(supabaseStatus, color = if (supabaseStatus.startsWith("Connected")) Cyan else Amber, fontSize = 12.sp)
                             TextButton(
                                 enabled = !supabaseChecking,
