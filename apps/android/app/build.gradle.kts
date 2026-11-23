@@ -15,7 +15,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         // Supabase publishable key is public client configuration, never a service-role secret.
-        buildConfigField("String", "NOVA_ANALYSIS_API_BASE_URL", "\"\")
+        buildConfigField("String", "NOVA_AI_API_BASE_URL", "\"https://voom-system-nova-ai.suwapat787.workers.dev\"")
         buildConfigField("String", "SUPABASE_URL", "\"https://rovhmjeowracayicbqij.supabase.co\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"sb_publishable_8v2gtmbRHCoKKnE3P2ZgaQ_Vr3tZYza\"")
     }
