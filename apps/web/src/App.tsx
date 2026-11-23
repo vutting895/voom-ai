@@ -3,7 +3,7 @@ import { AuthLifecycle } from "./authLifecycle.js";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type Language = "th" | "en";
-type View = "overview" | "market" | "analysis" | "bridge";
+type View = "dashboard" | "portfolio" | "overview" | "market" | "analysis" | "bridge";
 type ApiResult = Record<string, unknown>;
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -17,8 +17,8 @@ const copy = {
   th: {
     subtitle: "พื้นที่ควบคุมและวิเคราะห์ตลาดจาก NOVA Core",
     liveOff: "ปิดการเทรดจริง",
-    overview: "ภาพรวม", market: "ตลาด", analysis: "ผลวิเคราะห์", bridge: "การเชื่อมต่อ",
-    workspace: "พื้นที่ทำงาน", welcome: "ภาพรวมระบบ", overviewHint: "ตรวจสอบความพร้อมของระบบก่อนเริ่มวิเคราะห์",
+    dashboard: "แดชบอร์ด", portfolio: "พอร์ตลงทุน", overview: "ระบบ", market: "ตลาด", analysis: "AI Chat", bridge: "การเชื่อมต่อ",
+    workspace: "พื้นที่ทำงาน", welcome: "ภาพรวมระบบ", overviewHint: "ตรวจสอบความพร้อมของระบบก่อนเริ่มวิเคราะห์", dashboardTitle: "ภาพรวมพอร์ต", dashboardHint: "ติดตามมูลค่าพอร์ตและผลการดำเนินงานจากบัญชีที่เชื่อมต่อ", portfolioTitle: "รายละเอียดพอร์ต", portfolioHint: "ข้อมูลสินทรัพย์และสถานะการถือครองจาก MT5 Bridge", accountBalance: "Balance", equity: "Equity", floatingPnl: "กำไร/ขาดทุนลอยตัว", openPositions: "Positions ที่เปิดอยู่", totalPnl: "กำไร/ขาดทุนรวม", allocation: "สัดส่วนพอร์ต", noPortfolioData: "ยังไม่มีข้อมูลพอร์ตจากบัญชีจริง", dataNotVerified: "รอการเชื่อมต่อและยืนยันข้อมูล MT5", account: "บัญชี", asset: "สินทรัพย์", side: "ประเภท", volume: "ปริมาณ", entry: "ราคาเข้า", current: "ราคาปัจจุบัน", pnl: "P/L",
     core: "NOVA CORE", bridgeStatus: "MT5 BRIDGE", feed: "MARKET DATA", mode: "TRADING MODE",
     unverified: "ยังไม่ยืนยัน", notConnected: "ยังไม่มีข้อมูลการเชื่อมต่อ",
     readonly: "READ-ONLY", paper: "PAPER SIMULATION", off: "OFF",
@@ -39,8 +39,8 @@ const copy = {
   en: {
     subtitle: "Market intelligence workspace powered by NOVA Core",
     liveOff: "LIVE TRADING OFF",
-    overview: "Overview", market: "Markets", analysis: "Analysis", bridge: "Connections",
-    workspace: "WORKSPACE", welcome: "System overview", overviewHint: "Check system readiness before requesting analysis",
+    dashboard: "Dashboard", portfolio: "Portfolio", overview: "System", market: "Markets", analysis: "AI Chat", bridge: "Connections",
+    workspace: "WORKSPACE", welcome: "System overview", overviewHint: "Check system readiness before requesting analysis", dashboardTitle: "Portfolio dashboard", dashboardHint: "Monitor account value and performance from connected accounts", portfolioTitle: "Portfolio details", portfolioHint: "Assets and open positions reported by the MT5 Bridge", accountBalance: "Balance", equity: "Equity", floatingPnl: "Floating P/L", openPositions: "Open positions", totalPnl: "Total P/L", allocation: "Portfolio allocation", noPortfolioData: "No live portfolio data is available", dataNotVerified: "Waiting for verified MT5 connection data", account: "Account", asset: "Asset", side: "Side", volume: "Volume", entry: "Entry price", current: "Current price", pnl: "P/L",
     core: "NOVA CORE", bridgeStatus: "MT5 BRIDGE", feed: "MARKET DATA", mode: "TRADING MODE",
     unverified: "Not verified", notConnected: "No connection data available",
     readonly: "READ-ONLY", paper: "PAPER SIMULATION", off: "OFF",
@@ -61,9 +61,11 @@ const copy = {
 } satisfies Record<Language, Record<string, string>>;
 
 const nav: { id: View; icon: string }[] = [
-  { id: "overview", icon: "◫" },
-  { id: "market", icon: "⌁" },
+  { id: "dashboard", icon: "▦" },
+  { id: "portfolio", icon: "◈" },
   { id: "analysis", icon: "⌗" },
+  { id: "market", icon: "⌁" },
+  { id: "overview", icon: "◫" },
   { id: "bridge", icon: "⇄" },
 ];
 
@@ -253,6 +255,25 @@ export default function App() {
   }
 
   function content() {
+    if (view === "dashboard") return <div className="portfolio-page">
+      <section className="panel portfolio-hero"><div><span className="eyebrow">{t.workspace}</span><h2>{t.dashboardTitle}</h2><p>{t.dashboardHint}</p></div><StatusTag tone="warning">{t.dataNotVerified}</StatusTag></section>
+      <section className="portfolio-metrics" aria-label={t.dashboardTitle}>
+        {[t.accountBalance, t.equity, t.floatingPnl, t.openPositions, t.totalPnl].map(label => <article className="portfolio-metric" key={label}><span>{label}</span><strong>—</strong><small>{t.unverified}</small></article>)}
+      </section>
+      <section className="panel portfolio-section"><div className="section-heading"><div><span className="eyebrow">{t.account}</span><h2>{t.allocation}</h2><p>{t.dataNotVerified}</p></div><StatusTag>{t.unverified}</StatusTag></div>
+        <div className="portfolio-empty"><span className="empty-icon">◈</span><strong>{t.noPortfolioData}</strong><p>{t.dataNotVerified}</p><button className="text-button" onClick={() => setView("portfolio")}>{t.portfolio} ↗</button></div>
+      </section>
+    </div>;
+
+    if (view === "portfolio") return <div className="portfolio-page">
+      <section className="panel portfolio-hero"><div><span className="eyebrow">{t.workspace}</span><h2>{t.portfolioTitle}</h2><p>{t.portfolioHint}</p></div><StatusTag tone="warning">{t.unverified}</StatusTag></section>
+      <section className="panel portfolio-section"><div className="section-heading"><div><span className="eyebrow">{t.account}</span><h2>{t.openPositions}</h2><p>{t.dataNotVerified}</p></div><StatusTag>{t.unverified}</StatusTag></div>
+        <div className="portfolio-table-wrap"><table className="portfolio-table"><thead><tr><th>{t.asset}</th><th>{t.side}</th><th>{t.volume}</th><th>{t.entry}</th><th>{t.current}</th><th>{t.pnl}</th></tr></thead><tbody><tr><td colSpan={6} className="portfolio-no-data">{t.noPortfolioData}</td></tr></tbody></table></div>
+      </section>
+      <section className="portfolio-metrics portfolio-summary">{[t.accountBalance, t.equity, t.floatingPnl, t.totalPnl].map(label => <article className="portfolio-metric" key={label}><span>{label}</span><strong>—</strong><small>{t.unverified}</small></article>)}</section>
+    </div>;
+
+
     if (view === "market") return <section className="panel market-panel">
       <div className="section-heading"><div><span className="eyebrow">{t.workspace}</span><h2>{t.marketTitle}</h2><p>{t.marketHint}</p></div><StatusTag>{t.unverified}</StatusTag></div>
       <div className="market-empty">
