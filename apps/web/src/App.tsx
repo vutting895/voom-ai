@@ -4,10 +4,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 type Language = "th" | "en";
 type View = "overview" | "market" | "analysis" | "bridge";
 type ApiResult = Record<string, unknown>;
+type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-const apiBaseUrl = (import.meta.env.VITE_NOVA_ANALYSIS_API_BASE_URL as string | undefined)?.replace(/\/$/, "");
 const supabase: SupabaseClient | null = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
@@ -31,7 +31,7 @@ const copy = {
     safetyText: "หน้านี้ใช้สำหรับดูข้อมูลและวิเคราะห์เท่านั้น ไม่มีการส่งคำสั่งซื้อขายหรือแก้ไขบัญชีโบรกเกอร์",
     signIn: "เข้าสู่ระบบ", email: "อีเมล", password: "รหัสผ่าน", signOut: "ออกจากระบบ",
     config: "ยังไม่ได้ตั้งค่า Supabase หรือ NOVA API URL", authRequired: "กรุณาเข้าสู่ระบบก่อนวิเคราะห์",
-    analyze: "วิเคราะห์ข้อมูล", candles: "ข้อมูล OHLCV JSON", timeframe: "กรอบเวลา",
+    analyze: "วิเคราะห์ข้อมูล", candles: "ข้อความหรือคำถามสำหรับ NOVA AI", timeframe: "กรอบเวลา",
     result: "ผลการวิเคราะห์", invalidJson: "รูปแบบ JSON ไม่ถูกต้อง", apiFailed: "ไม่สามารถเรียก NOVA Analysis API ได้",
     footer: "VOOM AI · Powered by NOVA", language: "EN",
   },
@@ -53,7 +53,7 @@ const copy = {
     safetyText: "This workspace is for monitoring and analysis only. It cannot submit trades or modify broker accounts.",
     signIn: "Sign in", email: "Email", password: "Password", signOut: "Sign out",
     config: "Supabase or NOVA API URL is not configured", authRequired: "Sign in before requesting analysis",
-    analyze: "Analyze data", candles: "OHLCV JSON data", timeframe: "Timeframe",
+    analyze: "Analyze data", candles: "Message or research question", timeframe: "Timeframe",
     result: "Analysis result", invalidJson: "Invalid JSON format", apiFailed: "NOVA Analysis API request failed",
     footer: "VOOM AI · Powered by NOVA", language: "TH",
   },
@@ -83,9 +83,8 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [accessToken, setAccessToken] = useState("");
-  const [symbol, setSymbol] = useState("XAUUSDm");
-  const [timeframe, setTimeframe] = useState("H1");
-  const [candlesJson, setCandlesJson] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
   const [result, setResult] = useState<ApiResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -126,47 +125,29 @@ export default function App() {
   }
 
   async function analyze(event: FormEvent) {
-    event.preventDefault(); setError(""); setResult(null);
+    event.preventDefault();
+    setError("");
+    setResult(null);
     if (!accessToken) { setError(t.authRequired); return; }
-    if (!apiBaseUrl) { setError(t.config); return; }
-    if (!/^[A-Za-z0-9._-]{1,40}$/.test(symbol)) {
-      setError(language === "th" ? "รูปแบบ Symbol ไม่ถูกต้อง" : "Invalid symbol format");
+    const prompt = chatInput.trim();
+    if (!prompt) return;
+    if (prompt.length > 1200) {
+      setError(language === "th" ? "ข้อความยาวเกิน 1,200 ตัวอักษร" : "Message exceeds 1,200 characters");
       return;
     }
-    if (candlesJson.length > 250_000) {
-      setError(language === "th" ? "ข้อมูลมีขนาดใหญ่เกินไป (สูงสุด 250 KB)" : "Payload is too large (250 KB maximum)");
-      return;
-    }
-    let candles: unknown;
-    try { candles = JSON.parse(candlesJson); } catch { setError(t.invalidJson); return; }
-    if (!Array.isArray(candles) || candles.length < 35 || candles.length > 500) {
-      setError(language === "th" ? "ต้องส่งข้อมูลแท่งเทียน 35–500 แท่ง" : "Provide between 35 and 500 candles");
-      return;
-    }
-    const validCandles = candles.every((item: unknown) => {
-      if (typeof item !== "object" || item === null || Array.isArray(item)) return false;
-      const candle = item as Record<string, unknown>;
-      const values = [candle.o, candle.h, candle.l, candle.c, candle.v];
-      return typeof candle.t === "string"
-        && Number.isFinite(Date.parse(candle.t))
-        && values.every(value => typeof value === "number" && Number.isFinite(value))
-        && (candle.h as number) >= Math.max(candle.o as number, candle.c as number)
-        && (candle.l as number) <= Math.min(candle.o as number, candle.c as number)
-        && (candle.h as number) >= (candle.l as number)
-        && (candle.v as number) >= 0;
-    });
-    if (!validCandles) {
-      setError(language === "th" ? "ข้อมูล OHLCV ไม่ถูกต้อง: ต้องมี t, o, h, l, c, v และค่าต้องสมเหตุสมผล" : "Invalid OHLCV data: require valid t, o, h, l, c, v values");
+    const requestMessages = [...chatMessages, { role: "user" as const, content: prompt }].slice(-8);
+    if (requestMessages.reduce((total, item) => total + item.content.length, 0) > 8000) {
+      setError(language === "th" ? "ประวัติการสนทนามีขนาดใหญ่เกินไป" : "Conversation is too large");
       return;
     }
     setBusy(true);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch(`${apiBaseUrl}/v1/analysis/candles`, {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ symbol, timeframe, candles }),
+        body: JSON.stringify({ messages: requestMessages }),
         signal: controller.signal,
       });
       const responseText = await response.text();
@@ -179,18 +160,22 @@ export default function App() {
         payload = decoded as ApiResult;
       } catch {
         throw new Error(language === "th"
-          ? `NOVA API ส่งข้อมูลที่ไม่ใช่ JSON (HTTP ${response.status}) โปรดตรวจสอบ API URL และ Reverse Proxy`
-          : `NOVA API returned non-JSON content (HTTP ${response.status}). Check the API URL and reverse proxy.`);
+          ? `NOVA AI ส่งข้อมูลที่ไม่ใช่ JSON (HTTP ${response.status})`
+          : `NOVA AI returned non-JSON content (HTTP ${response.status})`);
       }
       if (!response.ok) {
-        throw new Error(language === "th"
-          ? `NOVA API ปฏิเสธคำขอ (HTTP ${response.status})`
-          : `NOVA API rejected the request (HTTP ${response.status})`);
+        const code = typeof payload.error === "string" ? payload.error : `HTTP ${response.status}`;
+        throw new Error(language === "th" ? `NOVA AI ปฏิเสธคำขอ: ${code}` : `NOVA AI rejected the request: ${code}`);
       }
+      if (typeof payload.message !== "string" || !payload.message.trim()) {
+        throw new Error(language === "th" ? "NOVA AI ไม่ได้ส่งข้อความตอบกลับที่ถูกต้อง" : "NOVA AI returned an invalid message");
+      }
+      setChatMessages([...requestMessages, { role: "assistant", content: payload.message }].slice(-8));
       setResult(payload);
+      setChatInput("");
     } catch (cause) {
       setError(cause instanceof DOMException && cause.name === "AbortError"
-        ? (language === "th" ? "หมดเวลารอ NOVA API (15 วินาที)" : "NOVA API timed out (15 seconds)")
+        ? (language === "th" ? "หมดเวลารอ NOVA AI (15 วินาที)" : "NOVA AI timed out (15 seconds)")
         : cause instanceof Error ? cause.message : t.apiFailed);
     } finally {
       window.clearTimeout(timeout);
@@ -202,6 +187,8 @@ export default function App() {
     if (!supabase) {
       setAccessToken("");
       setResult(null);
+      setChatMessages([]);
+      setChatInput("");
       setView("overview");
       return;
     }
@@ -213,6 +200,8 @@ export default function App() {
       }
       setAccessToken("");
       setResult(null);
+      setChatMessages([]);
+      setChatInput("");
       setView("overview");
       setError("");
     } catch {
@@ -232,17 +221,20 @@ export default function App() {
 
     if (view === "analysis") return <section className="panel">
       <div className="section-heading"><div><span className="eyebrow">{t.workspace}</span><h2>{t.analysisTitle}</h2><p>{t.analysisHint}</p></div></div>
+      <div className="chat-thread" role="log" aria-live="polite" aria-label={t.analysisTitle}>
+        {chatMessages.length === 0
+          ? <div className="empty-inline"><span className="empty-icon">⌗</span><strong>{t.noAnalysis}</strong><p>{t.noAnalysisHint}</p></div>
+          : chatMessages.map((message, index) => <article className={message.role === "user" ? "chat-message chat-user" : "chat-message chat-assistant"} key={`${index}-${message.role}`}>
+              <span>{message.role === "user" ? (language === "th" ? "คุณ" : "You") : "NOVA AI"}</span>
+              <p>{message.content}</p>
+            </article>)}
+      </div>
       <form className="analysis-form" onSubmit={analyze} noValidate>
-        <div className="form-grid">
-          <label>{t.symbol}<input value={symbol} onChange={e => setSymbol(e.target.value)} maxLength={40} /></label>
-          <label>{t.timeframe}<select value={timeframe} onChange={e => setTimeframe(e.target.value)}>{["M1","M5","M15","M30","H1","H4","D1"].map(v => <option key={v}>{v}</option>)}</select></label>
-        </div>
-        <label>{t.candles}<textarea value={candlesJson} onChange={e => setCandlesJson(e.target.value)} rows={7} placeholder='[{"t":"2026-01-01T00:00:00Z","o":...,"h":...,"l":...,"c":...,"v":...}]' /></label>
-        <div className="form-actions"><span>{language === "th" ? "ข้อมูลจากผู้ใช้ยังไม่ถือเป็นข้อมูลที่ Broker ยืนยัน" : "User-provided data is not broker-verified"}</span><button className="button-primary" disabled={busy || !candlesJson.trim()}>{busy ? (language === "th" ? "กำลังวิเคราะห์…" : "Analyzing…") : t.analyze}</button></div>
+        <label>{t.candles}<textarea value={chatInput} onChange={e => setChatInput(e.target.value)} rows={4} maxLength={1200} placeholder={language === "th" ? "ถามเกี่ยวกับตลาด กลยุทธ์ หรือความเสี่ยง..." : "Ask about markets, research, strategy, or risk..."} /></label>
+        <div className="form-actions"><span>{language === "th" ? "NOVA AI Research · คำตอบเพื่อการศึกษาเท่านั้น · ไม่มีคำสั่งซื้อขาย" : "NOVA AI Research · Informational only · No trade execution"}</span><button className="button-primary" disabled={busy || !chatInput.trim()}>{busy ? (language === "th" ? "กำลังตอบ..." : "Thinking...") : t.analyze}</button></div>
       </form>
       {error && <p className="inline-error" role="alert">{error}</p>}
-      {result && <div className="result-block"><h3>{t.result}</h3><pre>{JSON.stringify(result, null, 2)}</pre></div>}
-      {!result && !error && <div className="empty-inline"><span className="empty-icon">⌗</span><strong>{t.noAnalysis}</strong><p>{t.noAnalysisHint}</p></div>}
+      {result && <p className="response-meta">{String(result.provider ?? "NOVA AI")} · {String(result.model ?? "Research")} · Live Trading OFF</p>}
     </section>;
 
     if (view === "bridge") return <section className="panel">
