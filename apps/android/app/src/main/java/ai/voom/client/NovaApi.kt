@@ -38,17 +38,29 @@ object NovaApi {
         }
     }
 
-    fun signIn(email: String, password: String, callback: (String?, String?) -> Unit) {
+    fun signIn(email: String, password: String, callback: (AuthSession?, String?) -> Unit) {
+        requestSession("password", JSONObject().put("email", email.trim()).put("password", password), callback)
+    }
+
+    /** Exchanges a refresh token and returns the rotated session supplied by Supabase. */
+    fun refreshSession(session: AuthSession, callback: (AuthSession?, String?) -> Unit) {
+        requestSession("refresh_token", JSONObject().put("refresh_token", session.refreshToken), callback)
+    }
+
+    private fun requestSession(
+        grantType: String,
+        payload: JSONObject,
+        callback: (AuthSession?, String?) -> Unit
+    ) {
         Thread {
-            var token: String? = null
+            var session: AuthSession? = null
             var error: String? = null
+            var connection: HttpURLConnection? = null
             try {
                 val base = BuildConfig.SUPABASE_URL.trimEnd('/')
                 require(base.startsWith("https://")) { "Supabase HTTPS endpoint is not configured" }
                 require(BuildConfig.SUPABASE_ANON_KEY.isNotBlank()) { "Supabase public client key is not configured" }
-                require(email.isNotBlank() && password.isNotBlank()) { "Email and password are required" }
-
-                val connection = (URL("$base/auth/v1/token?grant_type=password").openConnection() as HttpURLConnection).apply {
+                connection = (URL("$base/auth/v1/token?grant_type=$grantType").openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     instanceFollowRedirects = false
                     connectTimeout = CONNECT_TIMEOUT_MS
@@ -58,24 +70,24 @@ object NovaApi {
                     setRequestProperty("Content-Type", "application/json")
                     setRequestProperty("Accept", "application/json")
                 }
-                try {
-                    val body = JSONObject().put("email", email.trim()).put("password", password).toString()
-                    connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-                    val status = connection.responseCode
-                    val response = readBoundedText(if (status in 200..299) connection.inputStream else connection.errorStream)
-                    if (status !in 200..299) {
-                        error = if (status == 400 || status == 401) "Email or password is incorrect" else "Supabase Auth returned HTTP $status"
-                    } else {
-                        token = JSONObject(response).optString("access_token").takeIf { it.isNotBlank() }
-                        if (token == null) error = "Supabase Auth response did not contain an access token"
+                connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+                val status = connection.responseCode
+                val response = readBoundedText(if (status in 200..299) connection.inputStream else connection.errorStream)
+                if (status !in 200..299) {
+                    error = when (status) {
+                        400, 401 -> if (grantType == "refresh_token") "Session expired or refresh token rejected. Sign in again." else "Email or password is incorrect"
+                        429 -> "Supabase Auth rate limit reached. Try again later."
+                        else -> "Supabase Auth returned HTTP $status"
                     }
-                } finally {
-                    connection.disconnect()
+                } else {
+                    session = AuthSession.fromSupabaseResponse(JSONObject(response), System.currentTimeMillis() / 1000L)
                 }
             } catch (exception: Exception) {
                 error = exception.message?.take(160) ?: "Supabase Auth request failed"
+            } finally {
+                connection?.disconnect()
             }
-            mainHandler.post { callback(token, error) }
+            mainHandler.post { callback(session, error) }
         }.start()
     }
 
