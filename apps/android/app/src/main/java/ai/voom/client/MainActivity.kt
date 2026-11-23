@@ -86,8 +86,7 @@ private fun VoomApp() {
             error = if (thai) "กรุณากรอกอีเมลและรหัสผ่าน" else "Enter your email and password"
             return
         }
-        authOperations.begin()
-        val operationId = authOperations.currentId()
+        val operationId = authOperations.begin()
         authBusy = true
         error = ""
         NovaApi.signIn(email, password) { token, failure ->
@@ -119,8 +118,7 @@ private fun VoomApp() {
         if (token.isBlank()) return
 
         // Invalidate local UI state immediately; the remote revoke is best-effort.
-        authOperations.begin()
-        val operationId = authOperations.currentId()
+        val operationId = authOperations.begin()
         authBusy = true
         NovaApi.signOut(token) { failure ->
             // A late sign-out response must not overwrite a newer sign-in state.
