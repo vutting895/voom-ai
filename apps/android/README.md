@@ -23,10 +23,14 @@
 - MT5 Bridge status is not connected or verified.
 - The Android chat does not persist conversation history across app restarts.
 - NOVA AI chat is research/information only. It is not a candle-analysis API and must not be represented as broker-verified market analysis.
+- No Gradle Wrapper is committed; CI currently installs Gradle 8.9 explicitly. A wrapper should be added and validated before treating local and CI builds as reproducible across developer machines.
 
 ## Build status
 
-No Gradle Wrapper is committed yet. The GitHub Actions workflow installs a pinned Gradle version for a debug-only build. A successful build of the latest updated source and a matching APK artifact are not yet confirmed. Do not sign, install, distribute, or release an APK without separate approval.
+- GitHub Actions run #14 successfully completed `assembleDebug` on commit `e0e098570f4a6a5240b29fcda00ba3e8cdac7ed7`.
+- The matching debug artifact `voom-ai-android-debug` was uploaded successfully. SHA-256: `e4e7d51aedbe76255114e1063e7a123725108e5756bfad3a345bfabbb04bfcd6`.
+- This confirms CI compilation and packaging only. Physical-device installation, launch, login, chat, and runtime behavior are not verified.
+- Do not sign, install, distribute, or release an APK without the required review and separate approval.
 
 ## Safety
 
