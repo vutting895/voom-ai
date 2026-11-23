@@ -71,3 +71,20 @@ The worker rejects unknown routes and validates the Supabase bearer token throug
 - CI usage must remain within existing account allowances.
 - Local verification is preferred where practical.
 - Build, signing, installation, deployment, merge, and production release remain separate gates requiring explicit approval.
+
+## NOVA System Integration Hub client — staged implementation
+
+The clients now have a read-only integration path to the existing NOVA System Integration Hub:
+
+- Hub origin: `https://voom-system-hub.suwapat787.workers.dev`.
+- Protected routes used: `GET /v1/integrations` and `GET /v1/connections`.
+- Web route: same-origin `/api/core/v1/*`, proxied by `netlify/edge-functions/nova-core.ts` to a fixed Hub origin. The proxy allows only the two exact GET routes, forwards only the user's Bearer token, rejects query strings and redirects, applies a 10-second timeout, and caps response bodies at 32 KB.
+- Android calls the same two Hub routes directly over HTTPS with the signed-in user's Supabase access token.
+- Both clients fail closed unless the Hub responses explicitly report `ordersEnabled=false` and `liveTradingEnabled=false`. The UI distinguishes successful API authentication from verified broker data.
+- This slice does not create connections, submit credentials, read balances, fetch quotes, access MT5 Bridge data, or expose order/execution routes.
+
+### Runtime acceptance gate
+
+The NOVA Hub source authenticates against its configured Supabase project. The VOOM AI client is configured for project `rovhmjeowracayicbqij`. Before treating this integration as operational, confirm that the deployed `voom-system-hub` Worker is configured for that same project, then test authenticated `GET /v1/integrations` and `GET /v1/connections` from both clients. Do not change the Hub's production bindings without a separate explicit approval. Until that check passes, runtime status is `NOT VERIFIED`.
+
+The System Hub provider-registry endpoint `GET /v1/broker/providers` is not included here because its implementation is on a separate unmerged NOVA PR; this client uses only routes present on NOVA main.
