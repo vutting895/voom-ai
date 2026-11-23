@@ -63,7 +63,8 @@ private fun VoomApp() {
     var screen by remember { mutableStateOf(Screen.OVERVIEW) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var accessToken by remember { mutableStateOf("") }
+    var authSession by remember { mutableStateOf<AuthSession?>(null) }
+    val accessToken = authSession?.accessToken.orEmpty()
     var authBusy by remember { mutableStateOf(false) }
     val authOperations = remember { AuthOperationGate() }
     var chatInput by remember { mutableStateOf("") }
@@ -89,12 +90,12 @@ private fun VoomApp() {
         val operationId = authOperations.begin()
         authBusy = true
         error = ""
-        NovaApi.signIn(email, password) { token, failure ->
+        NovaApi.signIn(email, password) { session, failure ->
             // Ignore stale authentication callbacks after a newer auth operation.
             if (authOperations.isCurrent(operationId)) {
                 authBusy = false
-                if (!token.isNullOrBlank()) {
-                    accessToken = token
+                if (session != null) {
+                    authSession = session
                     password = ""
                     error = ""
                     screen = Screen.ANALYSIS
@@ -108,7 +109,7 @@ private fun VoomApp() {
 
     fun signOut() {
         val token = accessToken
-        accessToken = ""
+        authSession = null
         password = ""
         chatInput = ""
         chatMessages = emptyList()
@@ -135,7 +136,8 @@ private fun VoomApp() {
 
     fun sendMessage() {
         val prompt = chatInput.trim()
-        if (accessToken.isBlank()) {
+        val currentSession = authSession
+        if (currentSession == null) {
             error = if (thai) "กรุณาเข้าสู่ระบบก่อน" else "Sign in before using NOVA AI"
             return
         }
@@ -149,21 +151,42 @@ private fun VoomApp() {
             error = if (thai) "ประวัติการสนทนามีขนาดใหญ่เกินไป" else "Conversation is too large"
             return
         }
-        val requestToken = accessToken
+
         chatBusy = true
         error = ""
-        NovaApi.sendChat(requestToken, requestMessages) { reply, failure ->
-            // Ignore responses from a session that has already signed out or changed.
-            if (accessToken == requestToken) {
-                chatBusy = false
-                if (reply != null) {
-                    chatMessages = (requestMessages + NovaChatMessage("assistant", reply.message)).takeLast(8)
-                    chatInput = ""
-                    error = ""
-                } else {
-                    error = failure ?: if (thai) "NOVA AI ไม่พร้อมใช้งาน" else "NOVA AI is unavailable"
+        fun submitWith(session: AuthSession) {
+            if (authSession != session) return
+            NovaApi.sendChat(session.accessToken, requestMessages) { reply, failure ->
+                if (authSession == session) {
+                    chatBusy = false
+                    if (reply != null) {
+                        chatMessages = (requestMessages + NovaChatMessage("assistant", reply.message)).takeLast(8)
+                        chatInput = ""
+                        error = ""
+                    } else {
+                        error = failure ?: if (thai) "NOVA AI ไม่พร้อมใช้งาน" else "NOVA AI is unavailable"
+                    }
                 }
             }
+        }
+
+        if (currentSession.shouldRefresh(System.currentTimeMillis() / 1000L)) {
+            NovaApi.refreshSession(currentSession) { refreshed, failure ->
+                if (authSession == currentSession) {
+                    if (refreshed != null) {
+                        // Replace the whole session because Supabase can rotate refresh_token.
+                        authSession = refreshed
+                        submitWith(refreshed)
+                    } else {
+                        authSession = null
+                        chatBusy = false
+                        chatMessages = emptyList()
+                        error = failure ?: if (thai) "Session หมดอายุ กรุณาเข้าสู่ระบบใหม่" else "Session expired. Sign in again."
+                    }
+                }
+            }
+        } else {
+            submitWith(currentSession)
         }
     }
 
