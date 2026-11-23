@@ -58,6 +58,8 @@ class MainActivity : ComponentActivity() {
 private fun VoomApp() {
     var language by remember { mutableStateOf("TH") }
     var screen by remember { mutableStateOf(Screen.OVERVIEW) }
+    var supabaseStatus by remember { mutableStateOf("Not verified") }
+    var supabaseChecking by remember { mutableStateOf(false) }
     val thai = language == "TH"
     val title = when (screen) {
         Screen.OVERVIEW -> if (thai) "ภาพรวมระบบ" else "System overview"
@@ -109,7 +111,28 @@ private fun VoomApp() {
                         Screen.BRIDGE -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             StatusCard(if (thai) "NOVA CORE" else "NOVA CORE", if (thai) "ระบบวิเคราะห์หลัก" else "Analysis engine", thai)
                             StatusCard("MT5 BRIDGE", if (thai) "การเชื่อมต่อ MetaTrader 5" else "MetaTrader 5 connection", thai)
-                            Text(if (thai) "สถานะจะแสดงเมื่อได้รับ Heartbeat ที่ตรวจสอบได้เท่านั้น" else "Status appears only after a verifiable heartbeat.", color = Muted, fontSize = 11.sp)
+                            Text("Supabase Auth API", color = Muted, fontSize = 11.sp)
+                            Text(supabaseStatus, color = if (supabaseStatus.startsWith("Connected")) Cyan else Amber, fontSize = 12.sp)
+                            TextButton(
+                                enabled = !supabaseChecking,
+                                onClick = {
+                                    supabaseChecking = true
+                                    SupabaseConnection.check { result ->
+                                        supabaseStatus = result
+                                        supabaseChecking = false
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    if (supabaseChecking) {
+                                        if (thai) "กำลังตรวจสอบ…" else "Checking…"
+                                    } else {
+                                        if (thai) "ตรวจสอบ Supabase" else "Test Supabase"
+                                    },
+                                    color = Blue
+                                )
+                            }
+                            Text(if (thai) "สถานะ NOVA และ MT5 จะแสดงเมื่อได้รับข้อมูลยืนยันจาก API/Heartbeat จริงเท่านั้น" else "NOVA and MT5 status require verified API/heartbeat responses.", color = Muted, fontSize = 11.sp)
                         }
                     }
                     Text(if (thai) "READ-ONLY · PAPER SIMULATION เท่านั้น" else "READ-ONLY · PAPER SIMULATION ONLY", color = Cyan, fontSize = 9.sp, letterSpacing = .8.sp)
