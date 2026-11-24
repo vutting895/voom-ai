@@ -3,7 +3,7 @@ name: Client Build Verification
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-    branches: [main, feature/voom-ai-client-foundation]
+    branches: [main, feature/voom-ai-client-foundation, feature/voom-ai-nova-core-readonly-client]
     paths:
       - "apps/android/**"
       - "apps/web/**"
