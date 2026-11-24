@@ -33,7 +33,7 @@ class CoreSafetyContractTest {
     }
 
     @Test
-    fun rejectsConnectionWhenExecutionFlagIsMissingOnlyIfOtherFlagsMissing() {
+    fun allowsLegacyConnectionWhenMandatoryReadOnlyFlagsAreExplicit() {
         val item = JSONObject()
             .put("ordersEnabled", false)
             .put("liveTradingEnabled", false)
