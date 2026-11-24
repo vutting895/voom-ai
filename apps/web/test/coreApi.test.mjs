@@ -89,7 +89,7 @@ test("rejects malformed response and never treats non-verified data as connected
   await assert.rejects(() => fetchCoreSnapshot("user-token", async url => new Response(
     JSON.stringify(url.endsWith("/integrations") ? registry : { connections: "not-an-array", ordersEnabled: false, liveTradingEnabled: false }),
     { status: 200, headers: { "Content-Type": "application/json" } },
-  )), /missing integration or connection/);
+  )), /safety flags/);
 });
 
 test("fails closed when the Hub omits the execution safety flag", async () => {
