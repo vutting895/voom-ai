@@ -33,16 +33,13 @@ class CoreSafetyContractTest {
     }
 
     @Test
-    fun allowsLegacyConnectionWhenMandatoryReadOnlyFlagsAreExplicit() {
+    fun rejectsConnectionWhenExecutionFlagIsMissing() {
         val item = JSONObject()
             .put("ordersEnabled", false)
             .put("liveTradingEnabled", false)
-        // Older read-only Hub responses may omit executionEnabled; the two
-        // mandatory deny flags still have to be explicit.
-        assertEquals(
-            "unknown · unknown · unknown · data not verified",
+        assertThrows(IllegalArgumentException::class.java) {
             CoreSafetyContract.connectionSummary(item)
-        )
+        }
     }
 
     @Test
