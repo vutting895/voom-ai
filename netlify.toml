@@ -9,3 +9,7 @@
 [[edge_functions]]
   function = "nova-chat"
   path = "/api/chat"
+
+[[edge_functions]]
+  function = "nova-core"
+  path = "/api/core/*"

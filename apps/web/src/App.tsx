@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AuthLifecycle } from "./authLifecycle.js";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { fetchCoreSnapshot, type CoreSnapshot } from "./coreApi.js";
 
 type Language = "th" | "en";
 type View = "dashboard" | "portfolio" | "overview" | "market" | "analysis" | "bridge";
@@ -91,6 +92,9 @@ export default function App() {
   const [result, setResult] = useState<ApiResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [coreSnapshot, setCoreSnapshot] = useState<CoreSnapshot | null>(null);
+  const [coreLoading, setCoreLoading] = useState(false);
+  const [coreError, setCoreError] = useState("");
   const chatAbortRef = useRef<AbortController | null>(null);
   const authLifecycleRef = useRef(new AuthLifecycle());
   const t = copy[language];
@@ -117,6 +121,9 @@ export default function App() {
         chatAbortRef.current = null;
         setBusy(false);
         setResult(null);
+        setCoreSnapshot(null);
+        setCoreLoading(false);
+        setCoreError("");
         setChatMessages([]);
         setChatInput("");
         setError("");
@@ -224,6 +231,27 @@ export default function App() {
     }
   }
 
+  async function refreshCoreStatus() {
+    if (!accessToken) {
+      setCoreError(language === "th" ? "กรุณาเข้าสู่ระบบก่อนตรวจสอบ NOVA Core" : "Sign in before checking NOVA Core");
+      return;
+    }
+    const requestSnapshot = authLifecycleRef.current.snapshot();
+    setCoreLoading(true);
+    setCoreError("");
+    try {
+      const snapshot = await fetchCoreSnapshot(accessToken);
+      if (authLifecycleRef.current.isCurrent(requestSnapshot)) setCoreSnapshot(snapshot);
+    } catch (cause) {
+      if (authLifecycleRef.current.isCurrent(requestSnapshot)) {
+        setCoreSnapshot(null);
+        setCoreError(cause instanceof Error ? cause.message : "NOVA Core request failed");
+      }
+    } finally {
+      if (authLifecycleRef.current.isCurrent(requestSnapshot)) setCoreLoading(false);
+    }
+  }
+
   async function signOut() {
     const signOutSnapshot = authLifecycleRef.current.signOut();
     chatAbortRef.current?.abort();
@@ -246,6 +274,9 @@ export default function App() {
     if (!authLifecycleRef.current.isCurrent(signOutSnapshot)) return;
     setAccessToken("");
     setResult(null);
+    setCoreSnapshot(null);
+    setCoreLoading(false);
+    setCoreError("");
     setChatMessages([]);
     setChatInput("");
     setView("overview");
@@ -304,9 +335,21 @@ export default function App() {
     if (view === "bridge") return <section className="panel">
       <div className="section-heading"><div><span className="eyebrow">{t.workspace}</span><h2>{t.bridgeTitle}</h2><p>{t.bridgeHint}</p></div></div>
       <div className="connection-list">
-        <div className="connection-row"><span className="connection-icon">N</span><div><strong>NOVA Core</strong><small>{t.coreDesc}</small></div><StatusTag>{t.unverified}</StatusTag></div>
+        <div className="connection-row"><span className="connection-icon">N</span><div><strong>NOVA System Hub</strong><small>{t.coreDesc}</small></div><StatusTag tone={coreSnapshot ? "info" : "warning"}>{coreSnapshot ? (language === "th" ? "ยืนยันตัวตน API แล้ว" : "API authenticated") : t.unverified}</StatusTag></div>
         <div className="connection-row"><span className="connection-icon">M</span><div><strong>MT5 Bridge</strong><small>{t.bridgeDesc}</small></div><StatusTag>{t.unverified}</StatusTag></div>
       </div>
+      <button className="text-button" type="button" onClick={() => void refreshCoreStatus()} disabled={coreLoading || !accessToken}>
+        {coreLoading ? (language === "th" ? "กำลังตรวจสอบ..." : "Checking...") : (language === "th" ? "ตรวจสอบ NOVA Core" : "Check NOVA Core")}
+      </button>
+      {coreError && <p className="inline-error" role="alert">{coreError}</p>}
+      {coreSnapshot && <div className="notice">
+        <b>{language === "th" ? "การเชื่อมต่อที่บัญชีนี้มองเห็น" : "Connections visible to this account"}</b>
+        <span>{language === "th" ? "ตรวจสอบผ่าน Hub แบบ authenticated read-only" : "Authenticated read-only data from the System Hub"}</span>
+        {coreSnapshot.integrations.map((item, index) => <span key={`integration-${index}`}>{String(item.id)} · {String(item.verification ?? "not_checked")}</span>)}
+        {coreSnapshot.connections.length === 0
+          ? <span>{language === "th" ? "ยังไม่มี Connection ที่ผูกกับบัญชีนี้" : "No connections are registered for this account"}</span>
+          : coreSnapshot.connections.map((item, index) => <span key={`connection-${index}`}>{String(item.provider)} · {String(item.environment)} · {String(item.readiness)} · {item.dataVerified ? "data verified" : "data not verified"}</span>)}
+      </div>}
       <div className="notice"><b>{t.notConnected}</b><span>{t.bridgeHint}</span></div>
     </section>;
 

@@ -11,6 +11,7 @@ import java.net.URL
 
 data class NovaChatMessage(val role: String, val content: String)
 data class NovaChatReply(val message: String, val provider: String, val model: String)
+data class NovaCoreSnapshot(val integrations: List<String>, val connections: List<String>, val mode: String)
 
 object NovaApi {
     private const val CONNECT_TIMEOUT_MS = 8000
@@ -116,6 +117,96 @@ object NovaApi {
                 error = exception.message?.take(160) ?: "Supabase sign-out request failed"
             }
             mainHandler.post { callback(error) }
+        }.start()
+    }
+
+
+    private fun fetchCoreJson(path: String, accessToken: String): JSONObject {
+        require(accessToken.isNotBlank()) { "Sign in before checking NOVA Core" }
+        val base = BuildConfig.NOVA_CORE_API_BASE_URL.trimEnd('/')
+        require(base.startsWith("https://")) { "NOVA Core HTTPS endpoint is not configured" }
+        val connection = (URL("$base$path").openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            instanceFollowRedirects = false
+            connectTimeout = CONNECT_TIMEOUT_MS
+            readTimeout = READ_TIMEOUT_MS
+            setRequestProperty("Authorization", "Bearer $accessToken")
+            setRequestProperty("Accept", "application/json")
+        }
+        try {
+            val status = connection.responseCode
+            val response = readBoundedText(if (status in 200..299) connection.inputStream else connection.errorStream)
+            if (status !in 200..299) {
+                val code = runCatching { JSONObject(response).optString("error") }.getOrDefault("")
+                val detail = "NOVA System Hub returned HTTP " + status + " " + code.take(80)
+                throw IllegalStateException(
+                    when (status) {
+                        401 -> "NOVA Core rejected this session. Verify that the System Hub uses the same Supabase project."
+                        403 -> "NOVA Core denied this request."
+                        503 -> "NOVA System Hub authentication or data service is unavailable."
+                        else -> detail.trim()
+                    }
+                )
+            }
+            return JSONObject(response)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    fun fetchCoreSnapshot(
+        accessToken: String,
+        callback: (NovaCoreSnapshot?, String?) -> Unit
+    ) {
+        Thread {
+            var snapshot: NovaCoreSnapshot? = null
+            var error: String? = null
+            try {
+                val registry = fetchCoreJson("/v1/integrations", accessToken)
+                val connectionList = fetchCoreJson("/v1/connections", accessToken)
+                require(!registry.optBoolean("ordersEnabled", true) &&
+                    !registry.optBoolean("liveTradingEnabled", true)) {
+                    "NOVA Core registry did not confirm read-only safety flags"
+                }
+                require(!connectionList.optBoolean("ordersEnabled", true) &&
+                    !connectionList.optBoolean("liveTradingEnabled", true)) {
+                    "NOVA Core connections did not confirm read-only safety flags"
+                }
+                if (registry.has("executionEnabled")) {
+                    require(!registry.optBoolean("executionEnabled", true)) {
+                        "NOVA Core execution is not confirmed disabled"
+                    }
+                }
+                val integrationsJson = registry.optJSONArray("integrations")
+                    ?: throw IllegalStateException("NOVA Core registry response is invalid")
+                val connectionsJson = connectionList.optJSONArray("connections")
+                    ?: throw IllegalStateException("NOVA Core connection response is invalid")
+                val integrations = (0 until integrationsJson.length()).mapNotNull { index ->
+                    integrationsJson.optJSONObject(index)?.let { item ->
+                        item.optString("id", "unknown") + " · " + item.optString("verification", "not_checked")
+                    }
+                }
+                val connections = (0 until connectionsJson.length()).mapNotNull { index ->
+                    connectionsJson.optJSONObject(index)?.let { item ->
+                        require(!item.optBoolean("ordersEnabled", true) &&
+                            !item.optBoolean("liveTradingEnabled", true)) {
+                            "A connection response did not confirm read-only safety flags"
+                        }
+                        item.optString("provider", "unknown") + " · " +
+                            item.optString("environment", "unknown") + " · " +
+                            item.optString("readiness", "unknown") + " · " +
+                            (if (item.optBoolean("dataVerified", false)) "data verified" else "data not verified")
+                    }
+                }
+                snapshot = NovaCoreSnapshot(
+                    integrations = integrations,
+                    connections = connections,
+                    mode = registry.optString("mode", "unknown")
+                )
+            } catch (exception: Exception) {
+                error = exception.message?.take(180) ?: "NOVA Core request failed"
+            }
+            mainHandler.post { callback(snapshot, error) }
         }.start()
     }
 
