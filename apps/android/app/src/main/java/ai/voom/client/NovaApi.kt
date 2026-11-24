@@ -164,39 +164,21 @@ object NovaApi {
             try {
                 val registry = fetchCoreJson("/v1/integrations", accessToken)
                 val connectionList = fetchCoreJson("/v1/connections", accessToken)
-                require(!registry.optBoolean("ordersEnabled", true) &&
-                    !registry.optBoolean("liveTradingEnabled", true)) {
-                    "NOVA Core registry did not confirm read-only safety flags"
-                }
-                require(!connectionList.optBoolean("ordersEnabled", true) &&
-                    !connectionList.optBoolean("liveTradingEnabled", true)) {
-                    "NOVA Core connections did not confirm read-only safety flags"
-                }
-                if (registry.has("executionEnabled")) {
-                    require(!registry.optBoolean("executionEnabled", true)) {
-                        "NOVA Core execution is not confirmed disabled"
-                    }
-                }
+                CoreSafetyContract.requireReadOnly(registry, "NOVA Core registry")
+                CoreSafetyContract.requireReadOnly(connectionList, "NOVA Core connections")
                 val integrationsJson = registry.optJSONArray("integrations")
                     ?: throw IllegalStateException("NOVA Core registry response is invalid")
                 val connectionsJson = connectionList.optJSONArray("connections")
                     ?: throw IllegalStateException("NOVA Core connection response is invalid")
-                val integrations = (0 until integrationsJson.length()).mapNotNull { index ->
-                    integrationsJson.optJSONObject(index)?.let { item ->
-                        item.optString("id", "unknown") + " · " + item.optString("verification", "not_checked")
-                    }
+                val integrations = (0 until integrationsJson.length()).map { index ->
+                    val item = integrationsJson.optJSONObject(index)
+                        ?: throw IllegalStateException("NOVA Core registry contains an invalid record")
+                    item.optString("id", "unknown") + " · " + item.optString("verification", "not_checked")
                 }
-                val connections = (0 until connectionsJson.length()).mapNotNull { index ->
-                    connectionsJson.optJSONObject(index)?.let { item ->
-                        require(!item.optBoolean("ordersEnabled", true) &&
-                            !item.optBoolean("liveTradingEnabled", true)) {
-                            "A connection response did not confirm read-only safety flags"
-                        }
-                        item.optString("provider", "unknown") + " · " +
-                            item.optString("environment", "unknown") + " · " +
-                            item.optString("readiness", "unknown") + " · " +
-                            (if (item.optBoolean("dataVerified", false)) "data verified" else "data not verified")
-                    }
+                val connections = (0 until connectionsJson.length()).map { index ->
+                    val item = connectionsJson.optJSONObject(index)
+                        ?: throw IllegalStateException("NOVA Core connections contain an invalid record")
+                    CoreSafetyContract.connectionSummary(item)
                 }
                 snapshot = NovaCoreSnapshot(
                     integrations = integrations,
