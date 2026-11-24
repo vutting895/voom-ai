@@ -8,11 +8,10 @@ function isRecord(value) {
 }
 
 function assertReadOnly(payload) {
-  if (payload.ordersEnabled !== false || payload.liveTradingEnabled !== false) {
+  if (payload.ordersEnabled !== false ||
+      payload.executionEnabled !== false ||
+      payload.liveTradingEnabled !== false) {
     throw new Error("NOVA Core safety flags are missing or unsafe");
-  }
-  if ("executionEnabled" in payload && payload.executionEnabled !== false) {
-    throw new Error("NOVA Core execution flag is missing or unsafe");
   }
 }
 
@@ -52,8 +51,9 @@ export async function fetchCoreSnapshot(accessToken, fetchImpl = fetch) {
   }
   const safeConnections = connectionList.connections.filter(isRecord);
   if (safeConnections.some(connection =>
-    connection.ordersEnabled !== false || connection.liveTradingEnabled !== false ||
-    ("executionEnabled" in connection && connection.executionEnabled !== false)
+    connection.ordersEnabled !== false ||
+    connection.executionEnabled !== false ||
+    connection.liveTradingEnabled !== false
   )) {
     throw new Error("A NOVA Core connection did not confirm read-only safety flags");
   }
