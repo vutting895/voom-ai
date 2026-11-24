@@ -8,6 +8,7 @@ const registry = {
   mode: "read-only",
   ordersEnabled: false,
   liveTradingEnabled: false,
+  executionEnabled: false,
 };
 const connections = {
   connections: [{
@@ -19,10 +20,12 @@ const connections = {
     dataVerified: false,
     ordersEnabled: false,
     liveTradingEnabled: false,
+  executionEnabled: false,
   }],
   count: 1,
   ordersEnabled: false,
   liveTradingEnabled: false,
+  executionEnabled: false,
 };
 
 test("fetches only authenticated registry and owner-scoped connection routes", async () => {
@@ -50,6 +53,7 @@ test("accepts an authenticated empty connection list as an empty state, not an A
       count: 0,
       ordersEnabled: false,
       liveTradingEnabled: false,
+  executionEnabled: false,
     }),
     { status: 200, headers: { "Content-Type": "application/json" } },
   ));
@@ -75,6 +79,7 @@ test("rejects a connection record that does not confirm read-only flags", async 
       connections: [{ ...connections.connections[0], ordersEnabled: true }],
       ordersEnabled: false,
       liveTradingEnabled: false,
+  executionEnabled: false,
     }),
     { status: 200, headers: { "Content-Type": "application/json" } },
   )), /connection did not confirm read-only/);
@@ -84,5 +89,27 @@ test("rejects malformed response and never treats non-verified data as connected
   await assert.rejects(() => fetchCoreSnapshot("user-token", async url => new Response(
     JSON.stringify(url.endsWith("/integrations") ? registry : { connections: "not-an-array", ordersEnabled: false, liveTradingEnabled: false }),
     { status: 200, headers: { "Content-Type": "application/json" } },
-  )), /missing integration or connection/);
+  )), /safety flags/);
+});
+
+test("fails closed when the Hub omits the execution safety flag", async () => {
+  await assert.rejects(() => fetchCoreSnapshot("user-token", async url => {
+    const payload = structuredClone(url.endsWith("/integrations") ? registry : connections);
+    delete payload.executionEnabled;
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }), /safety flags/);
+});
+
+test("fails closed when an individual connection enables execution", async () => {
+  await assert.rejects(() => fetchCoreSnapshot("user-token", async url => {
+    const payload = structuredClone(url.endsWith("/integrations") ? registry : connections);
+    if (payload.connections?.[0]) payload.connections[0].executionEnabled = true;
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }), /connection did not confirm read-only/);
 });

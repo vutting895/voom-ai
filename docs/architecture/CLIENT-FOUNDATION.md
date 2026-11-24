@@ -80,7 +80,7 @@ The clients now have a read-only integration path to the existing NOVA System In
 - Protected routes used: `GET /v1/integrations` and `GET /v1/connections`.
 - Web route: same-origin `/api/core/v1/*`, proxied by `netlify/edge-functions/nova-core.ts` to a fixed Hub origin. The proxy allows only the two exact GET routes, forwards only the user's Bearer token, rejects query strings and redirects, applies a 10-second timeout, and caps response bodies at 32 KB.
 - Android calls the same two Hub routes directly over HTTPS with the signed-in user's Supabase access token.
-- Both clients fail closed unless the Hub responses explicitly report `ordersEnabled=false` and `liveTradingEnabled=false`. The UI distinguishes successful API authentication from verified broker data.
+- Both clients fail closed unless the Hub responses explicitly report `ordersEnabled=false`, `executionEnabled=false`, and `liveTradingEnabled=false`. The UI distinguishes successful API authentication from verified broker data.
 - This slice does not create connections, submit credentials, read balances, fetch quotes, access MT5 Bridge data, or expose order/execution routes.
 
 ### Runtime acceptance gate
