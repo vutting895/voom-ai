@@ -14,10 +14,8 @@ internal object CoreSafetyContract {
         require(!payload.optBoolean("liveTradingEnabled", true)) {
             "$label did not confirm live trading is disabled"
         }
-        if (payload.has("executionEnabled")) {
-            require(!payload.optBoolean("executionEnabled", true)) {
-                "$label did not confirm execution is disabled"
-            }
+        require(!payload.optBoolean("executionEnabled", true)) {
+            "$label did not confirm execution is disabled"
         }
     }
 
