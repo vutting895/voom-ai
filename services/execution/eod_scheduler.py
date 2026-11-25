@@ -113,6 +113,10 @@ class DurablePaperEODScheduler:
         self._require_utc(now)
         if not owner.strip():
             raise ValueError("owner is required")
+        if now.date() != trading_day:
+            raise ValueError("scheduler must run on the configured trading day")
+        if flatten_deadline_utc.tzinfo is not None:
+            raise ValueError("flatten_deadline_utc must be a naive UTC clock time")
         deadline = datetime.combine(trading_day, flatten_deadline_utc, tzinfo=timezone.utc)
         key = self.job_key(trading_day)
         if now < deadline:
@@ -150,7 +154,7 @@ class DurablePaperEODScheduler:
                                 attempt=row["attempt_count"], lease_expires_at=old_expiry)
             attempt = int(row["attempt_count"]) + 1
             merged_escalation = json.loads(row["escalation_json"]) if row["escalation_json"] else None
-            if escalation:
+            if escalation and not merged_escalation:
                 merged_escalation = escalation
                 connection.execute(
                     """INSERT INTO paper_event_journal(event_type, event_json, occurred_at)
