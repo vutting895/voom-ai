@@ -255,6 +255,8 @@ class PaperExecutionEngine:
             raise ValueError("End-of-day flatten must occur on the configured trading day")
         required_symbols = {p.symbol for p in self.positions.values() if p.is_open}
         missing_symbols = required_symbols.difference(marks.keys())
+        if any(price <= 0 for price in marks.values()):
+            raise ValueError("All end-of-day marks must be positive")
         if missing_symbols:
             raise ValueError(f"Missing close marks for: {', '.join(sorted(missing_symbols))}")
         closed: list[str] = []
