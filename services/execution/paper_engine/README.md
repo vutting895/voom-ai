@@ -23,7 +23,7 @@ python -m unittest discover -s services/execution -p 'test_*.py' -v
 - Persists position open/close, marks, rejects, daily locks and EOD flatten snapshots with corresponding append-only journal events.
 - Requires a file-backed SQLite path; state snapshot and event append commit atomically. Storage write failure puts the engine into fail-stop state; recreate it from the last durable snapshot before accepting more PAPER work.
 - Validates all required marks before an end-of-day close, preventing partial in-memory flattening due to missing or invalid marks.
-- `services/execution/eod_controller.py` is a callable PAPER-only controller (not a scheduler): an external test harness must invoke it at/after the configured deadline. It rejects missing/stale/future/malformed quotes, closes BUY positions at Bid and SELL positions at Ask, and persists the entire simulated close as one snapshot/journal transaction.
+- `services/execution/eod_controller.py` is a callable PAPER-only controller (not a scheduler): an external test harness must invoke it at/after the configured deadline. It rejects missing/stale/future/malformed quotes (and journals blocked attempts when SQLite persistence is enabled), closes BUY positions at Bid and SELL positions at Ask, and persists the entire simulated close as one snapshot/journal transaction.
 - Simulates stop/target exits and explicit end-of-day flattening using supplied paper marks.
 - Refuses day rollover while any paper position remains open.
 
