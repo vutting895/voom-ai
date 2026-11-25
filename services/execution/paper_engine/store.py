@@ -14,9 +14,11 @@ class SQLitePaperStore:
     SCHEMA_VERSION = 1
 
     def __init__(self, database_path: str | Path):
-        self.database_path = str(database_path)
-        if self.database_path != ":memory:":
-            Path(self.database_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
+        raw_path = str(database_path)
+        if raw_path == ":memory:":
+            raise ValueError("SQLitePaperStore requires a file-backed database for durable recovery")
+        self.database_path = str(Path(raw_path).expanduser())
+        Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as connection:
             connection.executescript(
                 """
