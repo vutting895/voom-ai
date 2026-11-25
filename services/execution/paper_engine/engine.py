@@ -9,6 +9,7 @@ from typing import Mapping
 
 from .models import (PaperPolicy, PaperPosition, PaperQuote, PaperResult,
                      PaperSignal, ResultCode, Side)
+from services.risk_engine import RiskEngine, RiskInput, RiskPolicy, RiskSide
 
 
 class PaperExecutionEngine:
@@ -21,6 +22,15 @@ class PaperExecutionEngine:
             raise ValueError("starting_equity must be positive")
         self.starting_equity = starting_equity
         self.policy = policy
+        self.risk_engine = RiskEngine(RiskPolicy(
+            max_trade_risk=policy.max_trade_risk,
+            max_aggregate_risk=policy.max_aggregate_risk,
+            max_daily_loss=policy.max_daily_loss,
+            daily_profit_target=policy.daily_profit_target,
+            max_open_positions=policy.max_open_positions,
+            max_spread=policy.max_spread,
+            max_entry_deviation=policy.max_entry_deviation,
+        ))
         self.trading_day = trading_day
         self.positions: dict[str, PaperPosition] = {}
         self.results: dict[str, PaperResult] = {}
@@ -73,8 +83,6 @@ class PaperExecutionEngine:
             return self.results[old_signal_id]
         if not signal.signal_id or not signal.idempotency_key or not signal.symbol:
             return self._reject(signal, "IDENTIFIERS_REQUIRED")
-        if signal.quantity <= 0 or signal.expected_entry <= 0 or signal.stop_loss <= 0 or signal.take_profit <= 0 or signal.value_per_price_unit <= 0:
-            return self._reject(signal, "INVALID_NON_POSITIVE_VALUE")
         if signal.expires_at <= now or signal.created_at > now:
             return self._reject(signal, "SIGNAL_EXPIRED_OR_FROM_FUTURE")
         if signal.created_at.date() != self.trading_day or now.date() != self.trading_day:
@@ -86,31 +94,21 @@ class PaperExecutionEngine:
         age = (now - quote.observed_at).total_seconds()
         if age < 0 or age > self.policy.quote_max_age_seconds:
             return self._reject(signal, "STALE_OR_FUTURE_QUOTE")
-        spread = quote.ask - quote.bid
-        if spread > self.policy.max_spread:
-            return self._reject(signal, "SPREAD_LIMIT_EXCEEDED")
-        if self.entry_locked:
-            return self._reject(signal, self.lock_reason or "ENTRY_LOCKED")
-        if self.daily_pnl() <= -self.policy.max_daily_loss:
-            self.entry_locked, self.lock_reason = True, "DAILY_LOSS_LIMIT"
-            return self._reject(signal, "DAILY_LOSS_LIMIT")
-        if self.daily_pnl() >= self.policy.daily_profit_target:
-            self.entry_locked, self.lock_reason = True, "DAILY_PROFIT_TARGET"
-            return self._reject(signal, "DAILY_PROFIT_TARGET")
-        if sum(1 for p in self.positions.values() if p.is_open) >= self.policy.max_open_positions:
-            return self._reject(signal, "MAX_OPEN_POSITIONS")
-        fill = quote.ask if signal.side is Side.BUY else quote.bid
-        if abs(fill - signal.expected_entry) > self.policy.max_entry_deviation:
-            return self._reject(signal, "ENTRY_DEVIATION_EXCEEDED")
-        if signal.side is Side.BUY and not (signal.stop_loss < fill < signal.take_profit):
-            return self._reject(signal, "INVALID_BUY_PROTECTION_LEVELS")
-        if signal.side is Side.SELL and not (signal.take_profit < fill < signal.stop_loss):
-            return self._reject(signal, "INVALID_SELL_PROTECTION_LEVELS")
-        risk = abs(fill - signal.stop_loss) * signal.quantity * signal.value_per_price_unit
-        if risk > self.policy.max_trade_risk:
-            return self._reject(signal, "PER_TRADE_RISK_LIMIT")
-        if self.aggregate_open_risk() + risk > self.policy.max_aggregate_risk:
-            return self._reject(signal, "AGGREGATE_OPEN_RISK_LIMIT")
+        decision = self.risk_engine.evaluate_entry(RiskInput(
+            side=RiskSide(signal.side.value), bid=quote.bid, ask=quote.ask,
+            expected_entry=signal.expected_entry, stop_loss=signal.stop_loss,
+            take_profit=signal.take_profit, quantity=signal.quantity,
+            value_per_price_unit=signal.value_per_price_unit,
+            current_open_risk=self.aggregate_open_risk(),
+            open_positions=sum(1 for p in self.positions.values() if p.is_open),
+            daily_pnl=self.daily_pnl(), entry_locked=self.entry_locked,
+        ))
+        if not decision.allowed:
+            if decision.reason_code in ("DAILY_LOSS_LIMIT", "DAILY_PROFIT_TARGET"):
+                self.entry_locked, self.lock_reason = True, decision.reason_code
+            return self._reject(signal, decision.reason_code)
+        fill = decision.fill_price
+        risk = decision.risk_amount
         position_id = hashlib.sha256(f"{signal.signal_id}:{signal.idempotency_key}".encode()).hexdigest()[:24]
         position = PaperPosition(position_id, signal.signal_id, signal.symbol, signal.side,
                                  signal.quantity, fill, signal.stop_loss, signal.take_profit,
@@ -180,11 +178,9 @@ class PaperExecutionEngine:
         return now.time() >= self.policy.flatten_deadline_utc and any(p.is_open for p in self.positions.values())
 
     def _apply_daily_locks(self) -> None:
-        pnl = self.daily_pnl()
-        if pnl <= -self.policy.max_daily_loss:
-            self.entry_locked, self.lock_reason = True, "DAILY_LOSS_LIMIT"
-        elif pnl >= self.policy.daily_profit_target:
-            self.entry_locked, self.lock_reason = True, "DAILY_PROFIT_TARGET"
+        lock_reason = self.risk_engine.daily_lock_reason(self.daily_pnl())
+        if lock_reason:
+            self.entry_locked, self.lock_reason = True, lock_reason
 
     def start_next_day(self, next_day: date, *, new_starting_equity: Decimal) -> None:
         if any(position.is_open for position in self.positions.values()):
