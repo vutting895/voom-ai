@@ -75,6 +75,8 @@ class PaperExecutionEngine:
             return self._reject(signal, "SIGNAL_EXPIRED_OR_FROM_FUTURE")
         if signal.created_at.date() != self.trading_day or now.date() != self.trading_day:
             return self._reject(signal, "INTRADAY_ONLY_WRONG_TRADING_DAY")
+        if now.time() >= self.policy.entry_cutoff_utc:
+            return self._reject(signal, "ENTRY_CUTOFF_REACHED")
         if quote.symbol != signal.symbol or quote.bid <= 0 or quote.ask < quote.bid:
             return self._reject(signal, "INVALID_OR_MISMATCHED_QUOTE")
         age = (now - quote.observed_at).total_seconds()
@@ -119,6 +121,8 @@ class PaperExecutionEngine:
         """Update paper marks and simulate protective exits when a level is crossed."""
         if not self._utc(now) or price <= 0:
             raise ValueError("A positive price and UTC timestamp are required")
+        if now.date() != self.trading_day:
+            raise ValueError("Paper marks must remain within the configured trading day")
         closed: list[str] = []
         for position in self.positions.values():
             if not position.is_open or position.symbol != symbol:
@@ -136,6 +140,8 @@ class PaperExecutionEngine:
     def close_position(self, position_id: str, *, price: Decimal, now: datetime, reason: str) -> PaperPosition:
         if not self._utc(now) or price <= 0:
             raise ValueError("A positive close price and UTC timestamp are required")
+        if now.date() != self.trading_day:
+            raise ValueError("Paper close must remain within the configured trading day")
         position = self.positions[position_id]
         if not position.is_open:
             return position
@@ -150,14 +156,24 @@ class PaperExecutionEngine:
         """Flatten the paper book only when an explicit mark is supplied per symbol."""
         if not self._utc(now):
             raise ValueError("UTC timestamp required")
+        if now.date() != self.trading_day:
+            raise ValueError("End-of-day flatten must occur on the configured trading day")
+        required_symbols = {p.symbol for p in self.positions.values() if p.is_open}
+        missing_symbols = required_symbols.difference(marks.keys())
+        if missing_symbols:
+            raise ValueError(f"Missing close marks for: {', '.join(sorted(missing_symbols))}")
         closed: list[str] = []
         for position in self.positions.values():
             if position.is_open:
-                if position.symbol not in marks:
-                    raise ValueError(f"Missing close mark for {position.symbol}")
                 self.close_position(position.position_id, price=marks[position.symbol], now=now, reason=reason)
                 closed.append(position.position_id)
         return closed
+
+    def flatten_deadline_missed(self, *, now: datetime) -> bool:
+        """Report an operational breach; this method does not invent a close price."""
+        if not self._utc(now) or now.date() != self.trading_day:
+            raise ValueError("UTC timestamp on the configured trading day required")
+        return now.time() >= self.policy.flatten_deadline_utc and any(p.is_open for p in self.positions.values())
 
     def _apply_daily_locks(self) -> None:
         pnl = self.daily_pnl()
