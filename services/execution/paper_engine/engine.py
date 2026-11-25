@@ -60,6 +60,10 @@ class PaperExecutionEngine:
         """Validate and simulate an immediate fill using the supplied paper quote."""
         if not self._utc(now) or not self._utc(signal.created_at) or not self._utc(signal.expires_at) or not self._utc(quote.observed_at):
             return self._reject(signal, "TIMESTAMP_MUST_BE_UTC")
+        if not isinstance(signal.side, Side):
+            return self._reject(signal, "INVALID_SIDE")
+        if signal.expires_at <= signal.created_at:
+            return self._reject(signal, "INVALID_SIGNAL_EXPIRY")
         fingerprint = self._fingerprint(signal)
         previous = self._idempotency.get(signal.idempotency_key)
         if previous:
