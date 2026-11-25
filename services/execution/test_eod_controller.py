@@ -89,6 +89,7 @@ class PaperEODControllerTests(unittest.TestCase):
         result = self.controller.run(self.engine, {}, now=EOD_TIME)
         self.assertEqual(result.status, EODStatus.BLOCKED_MISSING_QUOTE)
         self.assertTrue(all(p.is_open for p in self.engine.positions.values()))
+        self.assertEqual(self.engine.store.read_events()[-1]["event_type"], "EOD_FLATTEN_BLOCKED")
 
     def test_stale_quote_fails_closed(self):
         self.open_two_sides()
