@@ -117,6 +117,37 @@ class PaperEngineTests(unittest.TestCase):
         self.assertTrue(engine.positions[first.position_id].is_open)
         self.assertTrue(engine.positions[second.position_id].is_open)
 
+    def test_per_trade_risk_limit_rejected(self):
+        engine = make_engine(max_trade_risk=D("5"))
+        result = engine.submit(signal(), quote(), now=NOW)
+        self.assertEqual(result.reason, "PER_TRADE_RISK_LIMIT")
+
+    def test_daily_loss_lock_blocks_new_entries(self):
+        engine = make_engine(max_daily_loss=D("5"))
+        opened = engine.submit(signal(), quote(), now=NOW)
+        engine.close_position(opened.position_id, price=D("1990"), now=NOW + timedelta(seconds=1), reason="TEST_LOSS")
+        result = engine.submit(signal(signal_id="sig-2", idempotency_key="idem-2"),
+                               quote(), now=NOW + timedelta(seconds=2))
+        self.assertEqual(result.reason, "DAILY_LOSS_LIMIT")
+
+    def test_end_of_day_flatten_closes_all_positions(self):
+        engine = make_engine()
+        opened = engine.submit(signal(), quote(), now=NOW)
+        closed = engine.close_all({"XAUUSDm": D("2005")}, now=NOW.replace(hour=21), reason="END_OF_DAY")
+        self.assertEqual(closed, [opened.position_id])
+        self.assertFalse(engine.positions[opened.position_id].is_open)
+
+    def test_flatten_deadline_breach_is_detected(self):
+        engine = make_engine()
+        engine.submit(signal(), quote(), now=NOW)
+        self.assertTrue(engine.flatten_deadline_missed(now=NOW.replace(hour=22, minute=1)))
+
+    def test_invalid_side_rejected_without_exception(self):
+        engine = make_engine()
+        malformed = signal(side="BUY")
+        result = engine.submit(malformed, quote(), now=NOW)
+        self.assertEqual(result.reason, "INVALID_SIDE")
+
     def test_wrong_trading_day_rejected(self):
         engine = make_engine()
         next_day = NOW + timedelta(days=1)
