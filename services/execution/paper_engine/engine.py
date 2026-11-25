@@ -120,6 +120,11 @@ class PaperExecutionEngine:
             self._storage_failed = True
             raise
 
+    def _ensure_storage_healthy(self) -> None:
+        """Reject mutations before touching memory when durable storage has failed."""
+        if self._storage_failed:
+            raise RuntimeError("PAPER storage is in failed-stop state; recreate engine from durable state")
+
     @staticmethod
     def _utc(value: datetime) -> bool:
         return value.tzinfo is not None and value.utcoffset() == timezone.utc.utcoffset(value)
@@ -152,6 +157,7 @@ class PaperExecutionEngine:
 
     def submit(self, signal: PaperSignal, quote: PaperQuote, *, now: datetime) -> PaperResult:
         """Validate and simulate an immediate fill using the supplied paper quote."""
+        self._ensure_storage_healthy()
         if not self._utc(now) or not self._utc(signal.created_at) or not self._utc(signal.expires_at) or not self._utc(quote.observed_at):
             return self._reject(signal, "TIMESTAMP_MUST_BE_UTC")
         if not isinstance(signal.side, Side):
@@ -208,6 +214,7 @@ class PaperExecutionEngine:
 
     def mark(self, symbol: str, price: Decimal, *, now: datetime) -> list[str]:
         """Update paper marks and simulate protective exits when a level is crossed."""
+        self._ensure_storage_healthy()
         if not self._utc(now) or price <= 0:
             raise ValueError("A positive price and UTC timestamp are required")
         if now.date() != self.trading_day:
@@ -230,6 +237,7 @@ class PaperExecutionEngine:
         return closed
 
     def close_position(self, position_id: str, *, price: Decimal, now: datetime, reason: str, _persist_state: bool = True) -> PaperPosition:
+        self._ensure_storage_healthy()
         if not self._utc(now) or price <= 0:
             raise ValueError("A positive close price and UTC timestamp are required")
         if now.date() != self.trading_day:
@@ -250,6 +258,7 @@ class PaperExecutionEngine:
 
     def close_all(self, marks: Mapping[str, Decimal], *, now: datetime, reason: str = "END_OF_DAY") -> list[str]:
         """Flatten the paper book only when an explicit mark is supplied per symbol."""
+        self._ensure_storage_healthy()
         if not self._utc(now):
             raise ValueError("UTC timestamp required")
         if now.date() != self.trading_day:
@@ -283,6 +292,7 @@ class PaperExecutionEngine:
             self.entry_locked, self.lock_reason = True, lock_reason
 
     def start_next_day(self, next_day: date, *, new_starting_equity: Decimal) -> None:
+        self._ensure_storage_healthy()
         if any(position.is_open for position in self.positions.values()):
             raise RuntimeError("Cannot roll trading day while paper positions remain open")
         if next_day <= self.trading_day or new_starting_equity <= 0:
