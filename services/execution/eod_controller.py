@@ -69,7 +69,16 @@ class PaperEODController:
         invalid: set[str] = set()
         for symbol in symbols:
             quote = quotes[symbol]
-            if quote.symbol != symbol or quote.bid <= 0 or quote.ask < quote.bid:
+            if (not isinstance(quote, PaperQuote)
+                    or quote.symbol != symbol
+                    or not isinstance(quote.bid, Decimal)
+                    or not isinstance(quote.ask, Decimal)
+                    or not quote.bid.is_finite()
+                    or not quote.ask.is_finite()
+                    or quote.bid <= 0
+                    or quote.ask < quote.bid
+                    or quote.observed_at.tzinfo is None
+                    or quote.observed_at.utcoffset() != timezone.utc.utcoffset(quote.observed_at)):
                 invalid.add(symbol)
                 continue
             age = (now - quote.observed_at).total_seconds()
