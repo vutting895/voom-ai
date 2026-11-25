@@ -1,6 +1,6 @@
 """Standard-library tests for the PAPER-only engine. Run: python -m unittest discover -s services/execution/paper_engine -p 'test_*.py'"""
 import unittest
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal as D
 
 from services.execution.paper_engine.engine import PaperExecutionEngine
@@ -14,8 +14,8 @@ def make_engine(**overrides):
     values = dict(max_trade_risk=D("100"), max_aggregate_risk=D("200"),
                   max_daily_loss=D("50"), daily_profit_target=D("40"),
                   max_open_positions=2, max_spread=D("0.5"),
-                  max_entry_deviation=D("1"), entry_cutoff_utc=__import__('datetime').time(20, 0),
-                  flatten_deadline_utc=__import__('datetime').time(22, 0), quote_max_age_seconds=5)
+                  max_entry_deviation=D("1"), entry_cutoff_utc=time(20, 0),
+                  flatten_deadline_utc=time(22, 0), quote_max_age_seconds=5)
     values.update(overrides)
     return PaperExecutionEngine(starting_equity=D("10000"), policy=PaperPolicy(**values), trading_day=date(2026, 11, 25))
 
