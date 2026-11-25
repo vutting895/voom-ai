@@ -78,6 +78,18 @@ class DurableEODSchedulerTests(unittest.TestCase):
             self.scheduler.mark_blocked(first, reason="stale worker", result="BLOCKED",
                                         now=NOW + timedelta(seconds=12))
 
+    def test_expired_lease_cannot_complete_without_reclaim(self):
+        claim = self.scheduler.claim(
+            trading_day=DAY, flatten_deadline_utc=DEADLINE,
+            owner="worker", now=NOW,
+        )
+        with self.assertRaises(RuntimeError):
+            self.scheduler.complete(
+                claim, engine=FakeEngine(),
+                eod_result=EODResult(EODStatus.NO_OPEN_POSITIONS),
+                now=NOW + timedelta(seconds=11),
+            )
+
     def test_not_due_does_not_claim(self):
         result = self.scheduler.claim(
             trading_day=DAY, flatten_deadline_utc=DEADLINE,
