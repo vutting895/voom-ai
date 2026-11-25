@@ -162,7 +162,7 @@ Dashboards must distinguish `PROPOSED`, `PAPER_SIMULATED`, `BROKER_ACKNOWLEDGED`
 ## 12. Delivery phases and exit criteria
 
 1. **Architecture/contracts:** approved service boundaries, state machines, API contract and safety invariants.
-2. **Paper engine:** deterministic simulator, event journal, idempotency and failure-injection tests; no broker-write code. A first in-memory Paper harness and separate deterministic risk package exist on stacked draft PRs; tests are authored but not yet executed.
+2. **Paper engine:** deterministic simulator, event journal, idempotency and failure-injection tests; no broker-write code. The PAPER harness now has optional file-backed SQLite snapshots, an append-only event journal and restart restoration for positions/results/idempotency/daily locks. This is single-host PAPER persistence, not a shared production database or broker reconciliation. Tests are authored but not yet executed.
 3. **Demo adapter:** separate work order and approval; controlled Demo credentials, account binding and broker-state reconciliation.
 4. **Reliability/security:** disconnect, timeout, partial fill, duplicate, restart, daily cutoff, emergency management and tenant-isolation tests.
 5. **Production readiness:** evidence review, risk thresholds approval, operational runbooks, monitoring and independent authorization.
