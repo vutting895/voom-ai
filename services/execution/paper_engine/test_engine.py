@@ -14,7 +14,8 @@ def make_engine(**overrides):
     values = dict(max_trade_risk=D("100"), max_aggregate_risk=D("200"),
                   max_daily_loss=D("50"), daily_profit_target=D("40"),
                   max_open_positions=2, max_spread=D("0.5"),
-                  max_entry_deviation=D("1"), quote_max_age_seconds=5)
+                  max_entry_deviation=D("1"), entry_cutoff_utc=__import__('datetime').time(20, 0),
+                  flatten_deadline_utc=__import__('datetime').time(22, 0), quote_max_age_seconds=5)
     values.update(overrides)
     return PaperExecutionEngine(starting_equity=D("10000"), policy=PaperPolicy(**values), trading_day=date(2026, 11, 25))
 
@@ -98,6 +99,23 @@ class PaperEngineTests(unittest.TestCase):
         engine.submit(signal(), quote(), now=NOW)
         with self.assertRaises(ValueError):
             engine.close_all({}, now=NOW + timedelta(hours=5))
+
+    def test_entry_cutoff_rejects_new_positions(self):
+        engine = make_engine()
+        after_cutoff = NOW.replace(hour=20, minute=1)
+        late_signal = signal(created_at=after_cutoff, expires_at=after_cutoff + timedelta(minutes=1))
+        result = engine.submit(late_signal, quote(observed_at=after_cutoff), now=after_cutoff)
+        self.assertEqual(result.reason, "ENTRY_CUTOFF_REACHED")
+
+    def test_close_all_validates_all_marks_before_mutation(self):
+        engine = make_engine(max_open_positions=2)
+        first = engine.submit(signal(), quote(), now=NOW)
+        second_signal = signal(signal_id="sig-2", idempotency_key="idem-2")
+        second = engine.submit(second_signal, quote(), now=NOW)
+        with self.assertRaises(ValueError):
+            engine.close_all({}, now=NOW + timedelta(hours=5))
+        self.assertTrue(engine.positions[first.position_id].is_open)
+        self.assertTrue(engine.positions[second.position_id].is_open)
 
     def test_wrong_trading_day_rejected(self):
         engine = make_engine()
