@@ -291,6 +291,14 @@ class PaperExecutionEngine:
             now=now, reason=reason,
         )
 
+    def record_operational_event(self, event_type: str, event: dict, *, now: datetime) -> None:
+        """Persist an operational PAPER event without changing position state."""
+        if not self._utc(now) or now.date() != self.trading_day:
+            raise ValueError("UTC timestamp on the configured trading day required")
+        if not event_type:
+            raise ValueError("event_type is required")
+        self._persist(event_type, event, now)
+
     def flatten_deadline_missed(self, *, now: datetime) -> bool:
         """Report an operational breach; this method does not invent a close price."""
         if not self._utc(now) or now.date() != self.trading_day:
