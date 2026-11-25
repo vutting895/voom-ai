@@ -3,8 +3,8 @@ import unittest
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal as D
 
-from engine import PaperExecutionEngine
-from models import PaperPolicy, PaperQuote, PaperSignal, ResultCode, Side
+from services.execution.paper_engine.engine import PaperExecutionEngine
+from services.execution.paper_engine.models import PaperPolicy, PaperQuote, PaperSignal, ResultCode, Side
 
 UTC = timezone.utc
 NOW = datetime(2026, 11, 25, 10, 0, tzinfo=UTC)
