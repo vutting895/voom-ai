@@ -1,12 +1,13 @@
 # Paper Execution Engine
 
-This package is an isolated, deterministic simulator. It has no broker adapter, network client, credential loader, order-write API, or MT5/Bitkub integration. It is not a live execution service.
+This package is an isolated, deterministic simulator. It delegates deterministic entry decisions to `services/risk_engine`. It has no broker adapter, network client, credential loader, order-write API, or MT5/Bitkub integration. It is not a live execution service.
 
 ## Run tests
 
 From the repository root:
 
 ```bash
+python -m unittest discover -s services/risk_engine -p 'test_*.py' -v
 python -m unittest discover -s services/execution/paper_engine -p 'test_*.py' -v
 ```
 
