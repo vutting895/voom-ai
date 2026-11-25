@@ -248,28 +248,48 @@ class PaperExecutionEngine:
                           "realized_pnl": str(position.realized_pnl)}, now)
         return position
 
-    def close_all(self, marks: Mapping[str, Decimal], *, now: datetime, reason: str = "END_OF_DAY") -> list[str]:
-        """Flatten the paper book only when an explicit mark is supplied per symbol."""
+    def close_positions(self, position_marks: Mapping[str, Decimal], *, now: datetime,
+                        reason: str = "END_OF_DAY") -> list[str]:
+        """Atomically close the current PAPER book using an explicit mark per position."""
         if not self._utc(now):
             raise ValueError("UTC timestamp required")
         if now.date() != self.trading_day:
             raise ValueError("End-of-day flatten must occur on the configured trading day")
-        required_symbols = {p.symbol for p in self.positions.values() if p.is_open}
-        missing_symbols = required_symbols.difference(marks.keys())
-        if any(price <= 0 for price in marks.values()):
+        open_positions = {key: position for key, position in self.positions.items() if position.is_open}
+        missing = set(open_positions).difference(position_marks)
+        unknown = set(position_marks).difference(open_positions)
+        if missing:
+            raise ValueError(f"Missing close marks for positions: {', '.join(sorted(missing))}")
+        if unknown:
+            raise ValueError(f"Unknown or already closed positions: {', '.join(sorted(unknown))}")
+        if any(price <= 0 for price in position_marks.values()):
             raise ValueError("All end-of-day marks must be positive")
+        closed: list[str] = []
+        for position_id, position in open_positions.items():
+            self.close_position(position_id, price=position_marks[position_id], now=now,
+                                reason=reason, _persist_state=False)
+            closed.append(position_id)
+        if closed:
+            self._persist("PAPER_BOOK_FLATTENED", {
+                "position_ids": closed, "reason": reason,
+                "marks": {key: str(value) for key, value in position_marks.items()},
+            }, now)
+        return closed
+
+    def close_all(self, marks: Mapping[str, Decimal], *, now: datetime,
+                  reason: str = "END_OF_DAY") -> list[str]:
+        """Compatibility wrapper using one supplied close mark per symbol."""
+        open_positions = {key: position for key, position in self.positions.items() if position.is_open}
+        required_symbols = {position.symbol for position in open_positions.values()}
+        missing_symbols = required_symbols.difference(marks)
         if missing_symbols:
             raise ValueError(f"Missing close marks for: {', '.join(sorted(missing_symbols))}")
-        closed: list[str] = []
-        for position in self.positions.values():
-            if position.is_open:
-                self.close_position(position.position_id, price=marks[position.symbol], now=now,
-                                    reason=reason, _persist_state=False)
-                closed.append(position.position_id)
-        if closed:
-            self._persist("PAPER_BOOK_FLATTENED", {"position_ids": closed,
-                          "reason": reason, "marks": {key: str(value) for key, value in marks.items()}}, now)
-        return closed
+        if any(price <= 0 for price in marks.values()):
+            raise ValueError("All end-of-day marks must be positive")
+        return self.close_positions(
+            {key: marks[position.symbol] for key, position in open_positions.items()},
+            now=now, reason=reason,
+        )
 
     def flatten_deadline_missed(self, *, now: datetime) -> bool:
         """Report an operational breach; this method does not invent a close price."""
