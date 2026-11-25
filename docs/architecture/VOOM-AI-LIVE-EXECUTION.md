@@ -26,7 +26,7 @@ Non-goals for this phase:
 | Workspace | User interface, operational visibility, activation requests | Hold broker secrets or submit orders |
 | Sniper | Market analysis, strategy evaluation, signal proposal | Call broker write APIs |
 | NOVA Core | Identity, tenant authorization, policy registry, audit governance | Trust model/client assertions |
-| Risk Engine | Deterministic pre-trade and in-trade risk decisions | Modify its own policy from model output |
+| Risk Engine (`services/risk_engine`) | Deterministic pre-trade risk decisions and daily lock reasons | Modify its own policy from model output or dispatch orders |
 | Execution Service | Order lifecycle, idempotency, dispatch orchestration, position tracking | Bypass Risk Engine or Authorization |
 | Broker Adapter | Future protocol translation and broker-state retrieval | Be reachable from Workspace/Sniper |
 | Reconciliation | Compare internal state with broker-confirmed orders/deals/positions | Infer fills from submit acknowledgements |
@@ -38,7 +38,7 @@ Execution Service is the only future component permitted to dispatch broker orde
 1. Market data arrives with source, symbol, timeframe, event timestamp, receive timestamp and verification state.
 2. Sniper emits a typed signal proposal with strategy/model versions, direction, entry conditions, invalidation, stop-loss, take-profit and expiry.
 3. Signal validation rejects stale, malformed, duplicate or unverifiable proposals.
-4. Risk Engine computes size and checks trade risk, aggregate exposure, margin headroom, daily limits, spread, slippage assumptions and session rules.
+4. Risk Engine computes size and checks trade risk, aggregate exposure, daily limits, spread and entry deviation. Account-specific margin, currency conversion, fees and broker contract metadata remain future integration requirements.
 5. NOVA Core authorizes the service identity, tenant, account binding, policy version and current operating mode.
 6. Execution Service creates an immutable intent and idempotency key. In the current phase it can only be recorded/simulated in PAPER mode.
 7. A future authorized adapter may submit only after the production activation gate has been approved independently.
@@ -96,6 +96,8 @@ Mandatory controls:
 - Kill switch for new-entry dispatch and a distinct emergency close-management workflow.
 
 The previously discussed values (Daily Loss 10%, aggregate open risk 9%, maximum 5 orders) are **legacy proposals only**, not approved production defaults. They must not be silently activated. Final thresholds require documented backtest, stress-test and Demo evidence plus separate owner approval.
+
+A broker-independent deterministic Risk Engine has been added as a separate package. The Paper Execution Engine delegates pre-trade decisions to it. This is code-level separation for the Paper harness, not yet an independently deployed or authenticated risk service.
 
 ## 7. Authorization and operating modes
 
@@ -160,7 +162,7 @@ Dashboards must distinguish `PROPOSED`, `PAPER_SIMULATED`, `BROKER_ACKNOWLEDGED`
 ## 12. Delivery phases and exit criteria
 
 1. **Architecture/contracts:** approved service boundaries, state machines, API contract and safety invariants.
-2. **Paper engine:** deterministic simulator, event journal, idempotency and failure-injection tests; no broker-write code.
+2. **Paper engine:** deterministic simulator, event journal, idempotency and failure-injection tests; no broker-write code. A first in-memory Paper harness and separate deterministic risk package exist on stacked draft PRs; tests are authored but not yet executed.
 3. **Demo adapter:** separate work order and approval; controlled Demo credentials, account binding and broker-state reconciliation.
 4. **Reliability/security:** disconnect, timeout, partial fill, duplicate, restart, daily cutoff, emergency management and tenant-isolation tests.
 5. **Production readiness:** evidence review, risk thresholds approval, operational runbooks, monitoring and independent authorization.
