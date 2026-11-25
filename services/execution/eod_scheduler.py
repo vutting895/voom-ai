@@ -188,10 +188,10 @@ class DurablePaperEODScheduler:
             cursor = connection.execute(
                 """UPDATE paper_eod_jobs SET status=?, owner=NULL, lease_expires_at=NULL,
                    last_result=?, updated_at=? WHERE job_key=? AND status=? AND owner=?
-                   AND attempt_count=?""",
+                   AND attempt_count=? AND lease_expires_at>?""",
                 (JobStatus.BLOCKED.value, json.dumps(payload, sort_keys=True),
                  now.isoformat(), claim.job_key, JobStatus.CLAIMED.value,
-                 claim.owner, claim.attempt),
+                 claim.owner, claim.attempt, now.isoformat()),
             )
             if cursor.rowcount != 1:
                 connection.rollback()
@@ -228,10 +228,10 @@ class DurablePaperEODScheduler:
             cursor = connection.execute(
                 """UPDATE paper_eod_jobs SET status=?, owner=NULL, lease_expires_at=NULL,
                    last_result=?, updated_at=?, completed_at=?
-                   WHERE job_key=? AND status=? AND owner=? AND attempt_count=?""",
+                   WHERE job_key=? AND status=? AND owner=? AND attempt_count=? AND lease_expires_at>?""",
                 (JobStatus.COMPLETED.value, json.dumps(payload, sort_keys=True),
                  now.isoformat(), now.isoformat(), claim.job_key,
-                 JobStatus.CLAIMED.value, claim.owner, claim.attempt),
+                 JobStatus.CLAIMED.value, claim.owner, claim.attempt, now.isoformat()),
             )
             if cursor.rowcount != 1:
                 connection.rollback()
