@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
+from contextlib import closing
 from typing import Any, Mapping
 
 
@@ -16,7 +17,7 @@ class SQLitePaperStore:
         self.database_path = str(database_path)
         if self.database_path != ":memory:":
             Path(self.database_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS paper_state (
@@ -71,6 +72,7 @@ class SQLitePaperStore:
                 "INSERT INTO paper_event_journal(event_type, event_json, occurred_at) VALUES(?, ?, ?)",
                 (event_type, event_json, occurred_at),
             )
+            connection.commit()
 
     def load_snapshot(self) -> dict[str, Any] | None:
         with self._connect() as connection:
