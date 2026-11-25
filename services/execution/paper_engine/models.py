@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 from enum import Enum
 
@@ -28,6 +28,8 @@ class PaperPolicy:
     max_open_positions: int
     max_spread: Decimal
     max_entry_deviation: Decimal
+    entry_cutoff_utc: time
+    flatten_deadline_utc: time
     quote_max_age_seconds: int = 5
 
     def __post_init__(self) -> None:
@@ -37,6 +39,8 @@ class PaperPolicy:
             raise ValueError("All policy limits must be positive")
         if self.max_open_positions < 1 or self.quote_max_age_seconds < 1:
             raise ValueError("Position and quote-age limits must be positive")
+        if self.flatten_deadline_utc <= self.entry_cutoff_utc:
+            raise ValueError("Flatten deadline must be later than entry cutoff")
 
 
 @dataclass(frozen=True)
