@@ -221,7 +221,8 @@ class PaperExecutionEngine:
             hit_target = price >= position.take_profit if position.side is Side.BUY else price <= position.take_profit
             if hit_stop or hit_target:
                 self.close_position(position.position_id, price=position.stop_loss if hit_stop else position.take_profit,
-                                    now=now, reason="STOP_LOSS" if hit_stop else "TAKE_PROFIT")
+                                    now=now, reason="STOP_LOSS" if hit_stop else "TAKE_PROFIT",
+                                    _persist_state=False)
                 closed.append(position.position_id)
         self._apply_daily_locks()
         self._persist("PAPER_MARK_UPDATED", {"symbol": symbol, "price": str(price),
