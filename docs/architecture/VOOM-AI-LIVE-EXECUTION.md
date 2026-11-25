@@ -76,7 +76,7 @@ Exception states include `PROTECTION_MISSING`, `BROKER_STATE_UNKNOWN` and `EMERG
 - Stop opening new positions at the entry cutoff.
 - Begin controlled close-out before the flatten deadline; verify broker-confirmed flat state before the deadline.
 - Do not treat a close request as proof of closure. Reconcile open positions and pending orders until confirmed.
-- If the broker is unavailable near cutoff, raise a critical incident, preserve the outstanding close intent, and resume reconciliation immediately on recovery. Never claim the account is flat without broker evidence.
+- If the broker is unavailable near cutoff, raise a critical incident, preserve the outstanding close intent, and resume reconciliation immediately on recovery. Never claim the account is flat without broker evidence. The PAPER EOD controller only proves the simulated ledger was closed; it does not prove broker-side closure.
 - Strategy eligibility must reject any proposal whose expected holding horizon crosses the configured broker-day boundary.
 
 ## 6. Risk policy hierarchy
@@ -162,7 +162,7 @@ Dashboards must distinguish `PROPOSED`, `PAPER_SIMULATED`, `BROKER_ACKNOWLEDGED`
 ## 12. Delivery phases and exit criteria
 
 1. **Architecture/contracts:** approved service boundaries, state machines, API contract and safety invariants.
-2. **Paper engine:** deterministic simulator, event journal, idempotency and failure-injection tests; no broker-write code. The PAPER harness now has optional file-backed SQLite snapshots, an append-only event journal and restart restoration for positions/results/idempotency/daily locks. This is single-host PAPER persistence, not a shared production database or broker reconciliation. Tests are authored but not yet executed.
+2. **Paper engine:** deterministic simulator, event journal, idempotency and failure-injection tests; no broker-write code. The PAPER harness now has optional file-backed SQLite snapshots, an append-only event journal and restart restoration for positions/results/idempotency/daily locks. A PAPER EOD controller checks the configured flatten deadline and quote freshness, and uses Bid to close BUY positions and Ask to close SELL positions (per position, including mixed directions on one symbol). Missing, stale, future or malformed quotes block the simulated flatten and leave positions open. This is single-host PAPER persistence, not a shared production database or broker reconciliation. Tests are authored but not yet executed.
 3. **Demo adapter:** separate work order and approval; controlled Demo credentials, account binding and broker-state reconciliation.
 4. **Reliability/security:** disconnect, timeout, partial fill, duplicate, restart, daily cutoff, emergency management and tenant-isolation tests.
 5. **Production readiness:** evidence review, risk thresholds approval, operational runbooks, monitoring and independent authorization.
