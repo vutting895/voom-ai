@@ -1,4 +1,5 @@
 """Durable lease, retry and completion tests for the PAPER EOD watchdog."""
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -170,6 +171,56 @@ class DurableEODSchedulerTests(unittest.TestCase):
             owner="worker-2", now=NOW + timedelta(seconds=1),
         )
         self.assertEqual(second.status, ClaimStatus.ALREADY_COMPLETED)
+
+    def test_deadline_incident_is_not_duplicated_on_retry(self):
+        first = self.scheduler.claim(
+            trading_day=DAY, flatten_deadline_utc=DEADLINE,
+            owner="worker-1", now=NOW + timedelta(minutes=5),
+        )
+        self.scheduler.mark_blocked(
+            first, reason="quote unavailable", result="BLOCKED",
+            now=NOW + timedelta(minutes=5),
+        )
+        self.scheduler.claim(
+            trading_day=DAY, flatten_deadline_utc=DEADLINE,
+            owner="worker-2", now=NOW + timedelta(minutes=6),
+        )
+        events = self.store.read_events()
+        missed = [event for event in events if event["event_type"] == "EOD_DEADLINE_MISSED"]
+        self.assertEqual(len(missed), 1)
+
+    def test_completion_and_journal_roll_back_together(self):
+        claim = self.scheduler.claim(
+            trading_day=DAY, flatten_deadline_utc=DEADLINE,
+            owner="worker", now=NOW,
+        )
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("""
+                CREATE TRIGGER reject_eod_completion
+                BEFORE INSERT ON paper_event_journal
+                WHEN NEW.event_type = 'EOD_JOB_COMPLETED'
+                BEGIN SELECT RAISE(ABORT, 'injected journal failure'); END
+            """)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.scheduler.complete(
+                claim, engine=FakeEngine(),
+                eod_result=EODResult(EODStatus.NO_OPEN_POSITIONS), now=NOW,
+            )
+        with sqlite3.connect(self.path) as connection:
+            row = connection.execute(
+                "SELECT status, owner FROM paper_eod_jobs WHERE job_key=?",
+                (claim.job_key,),
+            ).fetchone()
+        self.assertEqual(row, ("CLAIMED", "worker"))
+        self.assertNotIn("EOD_JOB_COMPLETED",
+                         [event["event_type"] for event in self.store.read_events()])
+
+    def test_claim_rejects_wrong_trading_day(self):
+        with self.assertRaisesRegex(ValueError, "configured trading day"):
+            self.scheduler.claim(
+                trading_day=DAY - timedelta(days=1), flatten_deadline_utc=DEADLINE,
+                owner="worker", now=NOW,
+            )
 
     def test_utc_is_required(self):
         with self.assertRaises(ValueError):
