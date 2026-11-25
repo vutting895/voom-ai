@@ -58,10 +58,10 @@ class PaperEODController:
         symbols = {position.symbol for position in open_positions.values()}
         missing = sorted(symbol for symbol in symbols if symbol not in quotes)
         if missing:
-            return EODResult(
-                EODStatus.BLOCKED_MISSING_QUOTE,
-                blocked_symbols=tuple(missing),
-                reason="No close quote supplied; positions remain open",
+            return self._blocked(
+                engine, status=EODStatus.BLOCKED_MISSING_QUOTE,
+                symbols=tuple(missing),
+                reason="No close quote supplied; positions remain open", now=now,
             )
 
         close_marks: dict[str, Decimal] = {}
@@ -92,16 +92,16 @@ class PaperEODController:
                     )
 
         if invalid:
-            return EODResult(
-                EODStatus.BLOCKED_INVALID_QUOTE,
-                blocked_symbols=tuple(sorted(invalid)),
-                reason="Malformed or mismatched quote; positions remain open",
+            return self._blocked(
+                engine, status=EODStatus.BLOCKED_INVALID_QUOTE,
+                symbols=tuple(sorted(invalid)),
+                reason="Malformed or mismatched quote; positions remain open", now=now,
             )
         if stale:
-            return EODResult(
-                EODStatus.BLOCKED_STALE_QUOTE,
-                blocked_symbols=tuple(sorted(stale)),
-                reason="Quote is stale or from the future; positions remain open",
+            return self._blocked(
+                engine, status=EODStatus.BLOCKED_STALE_QUOTE,
+                symbols=tuple(sorted(stale)),
+                reason="Quote is stale or from the future; positions remain open", now=now,
             )
 
         closed = engine.close_positions(
