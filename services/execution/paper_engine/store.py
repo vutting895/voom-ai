@@ -55,7 +55,7 @@ class SQLitePaperStore:
         """Atomically commit current state and its journal event."""
         snapshot_json = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
         event_json = json.dumps(event, sort_keys=True, separators=(",", ":"))
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 """
@@ -75,7 +75,7 @@ class SQLitePaperStore:
             connection.commit()
 
     def load_snapshot(self) -> dict[str, Any] | None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT schema_version, snapshot_json FROM paper_state WHERE singleton_id=1"
             ).fetchone()
@@ -89,7 +89,7 @@ class SQLitePaperStore:
         return payload
 
     def read_events(self, *, after_sequence: int = 0) -> list[dict[str, Any]]:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 """
                 SELECT sequence, event_type, event_json, occurred_at
