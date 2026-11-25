@@ -99,3 +99,11 @@ test("returns generic not-found response across tenant boundaries", async () => 
   const job = await service.createJob(tenantA, "idem-key-0001", request());
   await assert.rejects(() => service.cancelJob(tenantB, job.jobId), error => error instanceof VisualAiError && error.code === "JOB_NOT_FOUND");
 });
+
+test("idempotency keys are isolated between users in the same tenant", async () => {
+  const service = new VisualAiService();
+  const userB = { tenantId: "tenant-a", userId: "user-b" };
+  const first = await service.createJob(tenantA, "idem-key-0001", request());
+  const second = await service.createJob(userB, "idem-key-0001", request({ requestId: "request-0002" }));
+  assert.notEqual(first.jobId, second.jobId);
+});
