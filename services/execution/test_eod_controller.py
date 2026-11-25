@@ -117,6 +117,29 @@ class PaperEODControllerTests(unittest.TestCase):
         self.assertEqual(result.status, EODStatus.BLOCKED_INVALID_QUOTE)
         self.assertTrue(all(p.is_open for p in self.engine.positions.values()))
 
+    def test_naive_quote_timestamp_fails_closed(self):
+        self.open_two_sides()
+        malformed = PaperQuote(
+            "XAUUSDm", D("1999.8"), D("2000.2"),
+            datetime(2026, 11, 25, 21, 59, 59),
+        )
+        result = self.controller.run(
+            self.engine, {"XAUUSDm": malformed}, now=EOD_TIME
+        )
+        self.assertEqual(result.status, EODStatus.BLOCKED_INVALID_QUOTE)
+        self.assertTrue(all(p.is_open for p in self.engine.positions.values()))
+
+    def test_non_finite_quote_price_fails_closed(self):
+        self.open_two_sides()
+        malformed = PaperQuote(
+            "XAUUSDm", D("NaN"), D("2000.2"), EOD_TIME
+        )
+        result = self.controller.run(
+            self.engine, {"XAUUSDm": malformed}, now=EOD_TIME
+        )
+        self.assertEqual(result.status, EODStatus.BLOCKED_INVALID_QUOTE)
+        self.assertTrue(all(p.is_open for p in self.engine.positions.values()))
+
     def test_repeated_run_is_idempotent_after_flatten(self):
         self.open_two_sides()
         first = self.controller.run(
