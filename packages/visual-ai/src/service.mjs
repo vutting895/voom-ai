@@ -156,7 +156,7 @@ export class VisualAiService {
       throw new VisualAiError("IDEMPOTENCY_KEY_REQUIRED", "A valid Idempotency-Key is required.");
     }
     const normalized = validateRequest(request);
-    const dedupeKey = `${context.tenantId}:${idempotencyKey}`;
+    const dedupeKey = `${context.tenantId}:${context.userId}:${idempotencyKey}`;
     const existingId = this.#idempotency.get(dedupeKey);
     if (existingId) return this.getJob(context, existingId);
     const providerJob = await this.#provider.createJob(normalized);
